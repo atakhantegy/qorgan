@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Дене өлшеміңе бейімделген өзін-өзі қорғау, күш және икемділік жаттығуларының анимациялық жаттықтырушысы.">
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Қорған жаттықтырушысы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one screen. A thin bar, the stage (~90% of the viewport) and a compact dock. Everything else lives in two sheets. */
+:root{
+  --bg:#EEF0F2; --surface:#FFFFFF; --ink:#141B22; --muted:#66717C; --line:#D5DADF;
+  --accent:#2340C4; --accent-soft:#DCE2FA; --warn:#B4610C; --ok:#1F7A4D;
+  --fig:#2B3540; --fig-far:#8D99A5; --opp:#CBD1D7; --bag:#C9CFD5; --bag-line:#98A2AB; --flash:#E0751A; --stage:#EEF0F2;
+  --z-clinch:#C9503A; --z-punch:#2340C4; --z-kick:#7C93F0;
+  --f-display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1418; --surface:#182027; --ink:#E6EAED; --muted:#909CA7; --line:#2A343D;
+  --accent:#8297FF; --accent-soft:#1E2850; --warn:#E9A04F; --ok:#5FC891;
+  --fig:#DCE2E7; --fig-far:#6C7884; --opp:#323C45; --bag:#2A343D; --bag-line:#4F5B65; --flash:#F2A54A; --stage:#0F1418;
+  --z-clinch:#E77A63; --z-punch:#8297FF; --z-kick:#4E62C4; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1418; --surface:#182027; --ink:#E6EAED; --muted:#909CA7; --line:#2A343D;
+  --accent:#8297FF; --accent-soft:#1E2850; --warn:#E9A04F; --ok:#5FC891;
+  --fig:#DCE2E7; --fig-far:#6C7884; --opp:#323C45; --bag:#2A343D; --bag-line:#4F5B65; --flash:#F2A54A; --stage:#0F1418;
+  --z-clinch:#E77A63; --z-punch:#8297FF; --z-kick:#4E62C4; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;overflow:hidden}
+button{font:inherit;font-weight:600;font-size:13px;padding:7px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;white-space:nowrap}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr)}
+.bar{display:flex;align-items:center;gap:10px;padding-inline:16px;padding-block:10px}
+.brand{font-family:var(--f-display);font-weight:800;font-size:15px;letter-spacing:-.01em}
+.style{font-size:12.5px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spacer{flex:1}
+.stage{position:relative;min-height:0;background:var(--stage)}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.cap-ov{position:absolute;left:16px;bottom:14px;right:16px;pointer-events:none;display:flex;flex-direction:column;gap:6px;max-width:560px}
+.tname{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.cap{font-family:var(--f-display);font-weight:600;font-size:clamp(16px,2.6vw,24px);line-height:1.25;text-wrap:balance}
+.dots{display:flex;gap:5px;pointer-events:auto}
+.dots button{padding:6px 0;border:none;background:none;border-radius:0;width:34px}
+.dots span{display:block;height:3px;border-radius:2px;background:var(--line)}
+.dots button.on span{background:var(--accent)}
+.dist{position:absolute;left:16px;top:10px;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.hud{position:absolute;top:10px;right:14px;text-align:right;display:flex;flex-direction:column;gap:0}
+.hud[hidden]{display:none}
+.hud-phase{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.hud-time{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:clamp(28px,5vw,46px);line-height:1}
+.hud-reps{font-size:12.5px;color:var(--muted)}
+.hud.rest .hud-time{color:var(--ok)}
+.hud.warn .hud-time{color:var(--warn)}
+.rbar{position:absolute;left:0;top:0;height:3px;background:var(--accent);width:0}
+.rbar.rest{background:var(--ok)}
+.kc{position:absolute;left:16px;top:10px;display:flex;flex-direction:column;gap:2px;max-width:60%}
+.kc[hidden]{display:none}
+.kc-row{display:flex;align-items:baseline;gap:6px}
+.kc-n{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:clamp(34px,6vw,56px);line-height:1;color:var(--accent)}
+.kc-of{font-family:var(--f-mono);font-size:14px;color:var(--muted)}
+.kc-bar{display:block;height:4px;width:min(260px,100%);background:var(--line);border-radius:2px;overflow:hidden;margin-top:4px}
+.kc-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.kc-st{font-size:13px;font-weight:600;margin-top:2px}
+.kc-st.up{color:var(--ok)}
+.kc-today{font-size:12px;color:var(--muted)}
+.tab{font-weight:600;border-radius:6px;padding:7px 10px}
+.sep{flex:none;width:1px;background:var(--line);margin:4px 2px}
+.chip .n{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);margin-left:4px}
+.chip[aria-pressed="true"] .n{color:inherit;opacity:.75}
+#b-1000{font-family:var(--f-mono)}
+.dock{display:flex;align-items:center;gap:10px;padding-inline:16px;padding-block:10px;border-top:1px solid var(--line);background:var(--bg)}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;min-width:0;flex:1;padding-block:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{font-weight:500}
+.chip.plan{border-color:var(--accent);color:var(--accent)}
+.ctrls{display:flex;gap:6px;flex:none}
+.ctrls button{min-width:38px;text-align:center}
+#b-round.on{background:var(--warn);border-color:var(--warn);color:var(--bg)}
+@media (max-width:720px){.dock{flex-direction:column;align-items:stretch;gap:8px}.ctrls{justify-content:space-between}}
+.sheet{position:fixed;inset:0;background:rgba(10,14,18,.35);display:flex;align-items:flex-end;justify-content:center;z-index:5}
+.sheet[hidden]{display:none}
+.panel{background:var(--surface);color:var(--ink);width:100%;max-width:440px;border-radius:14px 14px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;max-height:88%;overflow:auto}
+@media (min-width:721px){.sheet{align-items:center}.panel{border-radius:14px}}
+.panel h2{font-family:var(--f-display);font-size:17px;margin:0}
+.ph{display:flex;justify-content:space-between;align-items:center}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.f{display:flex;flex-direction:column;gap:4px}
+.f label,.lbl{font-size:12px;font-weight:600;color:var(--muted)}
+.f input,.f select{font:inherit;font-family:var(--f-mono);font-size:18px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:100%}
+.f select{font-family:var(--f-body);font-size:14px}
+.seg{display:flex;gap:6px}
+.seg button{flex:1}
+.hint{font-size:12px;color:var(--muted);line-height:1.45;margin:0}
+.panel ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.panel p{margin:0}
+.big{font-family:var(--f-display);font-weight:800;font-size:20px;color:var(--accent)}
+</style>
+
+<div class="app">
+  <header class="bar">
+    <span class="brand">Қорған</span>
+    <span class="style" id="style-pill"></span>
+    <span class="spacer"></span>
+    <button type="button" id="open-me">Өлшемдер</button>
+    <button type="button" id="open-info" aria-label="Стиль және ереже">?</button>
+  </header>
+
+  <main class="stage">
+    <canvas id="cv" tabindex="0" role="img" aria-label="Техника анимациясы"></canvas>
+    <div class="rbar" id="rbar"></div>
+    <div class="dist" id="dist"></div>
+    <div class="kc" id="kc" hidden>
+      <div class="kc-row"><span class="kc-n" id="kc-n">0</span><span class="kc-of">/ 1000</span></div>
+      <span class="kc-bar"><i id="kc-fill"></i></span>
+      <span class="kc-st" id="kc-st"></span>
+      <span class="kc-today" id="kc-today"></span>
+    </div>
+    <div class="hud" id="hud" hidden><span class="hud-phase" id="hud-phase"></span><span class="hud-time" id="hud-time">3:00</span><span class="hud-reps" id="hud-reps"></span></div>
+    <div class="cap-ov">
+      <span class="tname" id="anim-title"></span>
+      <p class="cap" id="cap" aria-live="polite"></p>
+      <div class="dots" id="dots"></div>
+    </div>
+  </main>
+
+  <footer class="dock">
+    <div class="chips" id="chips"></div>
+    <div class="ctrls">
+      <button type="button" id="b-prev" aria-label="Алдыңғы қадам">‹</button>
+      <button type="button" id="b-play" aria-label="Тоқтату">❚❚</button>
+      <button type="button" id="b-next" aria-label="Келесі қадам">›</button>
+      <button type="button" id="b-slow" aria-pressed="false">0.5×</button>
+      <button type="button" id="b-view" aria-pressed="false">Алдынан</button>
+      <button type="button" id="b-1000" aria-pressed="false" title="Мың рет">×1000</button>
+      <button type="button" id="b-round">Раунд</button>
+    </div>
+  </footer>
+</div>
+
+<div class="sheet" id="sheet-me" hidden>
+  <form class="panel" id="f" autocomplete="off">
+    <div class="ph"><h2>Өлшемдер</h2><button type="button" data-close>Дайын</button></div>
+    <div class="grid2">
+      <div class="f"><label for="h">Бой, см</label><input type="number" id="h" inputmode="numeric" min="130" max="220" value="178"></div>
+      <div class="f"><label for="w">Салмақ, кг</label><input type="number" id="w" inputmode="numeric" min="35" max="200" value="80"></div>
+      <div class="f"><label for="ws">Қол құлашы, см</label><input type="number" id="ws" inputmode="numeric" min="120" max="240" value="183"></div>
+      <div class="f"><label for="ins">Аяқ ұзындығы, см</label><input type="number" id="ins" inputmode="numeric" min="55" max="110" value="82"></div>
+    </div>
+    <p class="hint">Құлаш: екі қолды жанға созып, саусақ ұшынан саусақ ұшына. Аяқ: шаттан еденге.</p>
+    <div class="grid2">
+      <div class="f"><span class="lbl">Басым қол</span><div class="seg"><button type="button" id="hand-r" aria-pressed="true">Оң</button><button type="button" id="hand-l" aria-pressed="false">Сол</button></div></div>
+      <div class="f"><span class="lbl">Жыныс</span><div class="seg"><button type="button" id="sex-m" aria-pressed="true">Ер</button><button type="button" id="sex-f" aria-pressed="false">Әйел</button></div></div>
+    </div>
+    <div class="grid2">
+      <div class="f"><label for="r-n">Раунд саны</label><select id="r-n"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option></select></div>
+      <div class="f"><label for="r-len">Раунд / демалыс</label><select id="r-len"><option value="120">2 мин / 1 мин</option><option value="180" selected>3 мин / 1 мин</option></select></div>
+    </div>
+    <p class="hint">Раунд кезінде техника 30 секунд сайын ауысады, соққы сәтінде дыбыс шығады.</p>
+  </form>
+</div>
+
+<div class="sheet" id="sheet-info" hidden>
+  <div class="panel">
+    <div class="ph"><h2>Сенің стилің</h2><button type="button" data-close>Жабу</button></div>
+    <div class="big" id="i-name"></div>
+    <p id="i-idea"></p>
+    <ul id="i-plan"></ul>
+    <h2 style="margin-top:6px">Мың рет</h2>
+    <p>Мың түрлі техниканы бір-бір рет жасаған адамнан гөрі бір техниканы мың рет қайталаған адам қауіпті. «×1000» бөлімінде әр мақсатқа бір ғана техника таңдалған. Қайталау фигурамен бірге санауға жазылады.</p>
+    <p>Бөлім үш топқа бөлінген: <b>Көше</b> — өзін-өзі қорғау, <b>Күш</b> — отжимание, присед, тартылу, жамбас көпірі, аяқ көтеру, берпи, <b>Икемділік</b> — аяқ сермеу, тізерлеп созылу, алға еңкею, терең присед, қол айналдыру.</p>
+    <p class="hint">Мың қайталау бір қалыпта емес, біртіндеп ауырлайды: 0–100 баяу форма · 100–300 толық жылдамдық · 300–600 қап · 600–900 шаршаған күйде · 900–1000 кенет сигналмен. Қате формамен мың рет қайталасаң, қатені бекітесің.</p>
+    <p class="hint"><b>Көшедегі бірінші ереже:</b> болдырмау және кету. Қажетті қорғаныс ҚР ҚК 32-бабымен реттеледі — қорғаныс шабуылға сай болуы керек. Анимация жаттықтырушыны алмастырмайды.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const r0=x=>Math.round(x);
+const sgn=x=>(x>0?'+':x<0?'−':'±')+Math.abs(r0(x));
+const lerp=(a,b,u)=>a+(b-a)*u;
+const D2R=Math.PI/180;
+const KEY='qorgan-v3';
+function loadStore(){try{return JSON.parse(localStorage.getItem(KEY))||{}}catch(e){return {}}}
+function saveStore(o){try{localStorage.setItem(KEY,JSON.stringify(o))}catch(e){}}
+/* ================= Body model ================= */
+function model(d){
+  const hn=d.sex==='f'?163:175;
+  const bmi=d.w/Math.pow(d.h/100,2), ape=d.ws-d.h, legR=d.ins/d.h;
+  const arm=(d.ws-0.25*d.h)/2, punch=arm+0.10*d.h, clinch=0.5*arm, kick=d.ins*1.25;
+  const avgPunch=(hn-0.25*hn)/2+0.10*hn;
+  const z={tall:clamp((d.h-hn)/7,-2,2),ape:clamp(ape/4,-2,2),leg:clamp((legR-0.46)/0.015,-2,2),mass:clamp((bmi-24)/3,-2,2),
+    fit:d.fit-2,age:d.age>=50?-1:d.age>=38?-0.5:0,light:(d.sex==='m'?d.w<66:d.w<54)?1:0};
+  return {bmi,ape,legR,arm,punch,clinch,kick,avgPunch,z,hn};
+}
+
+/* ================= Archetypes ================= */
+const ARCH={
+ R:{name:'Ұзын қашықтық соққышы',short:'Ұзын қашықтық',idea:'Қашықтықты сен басқарасың: ұзын қол мен аяқпен қарсыласты өз аймағыңның шетінде ұстайсың.',
+    plan:['Ол сенің шекараңа кірген сәтте — джеб немесе итеру тебісі.','Соққыдан кейін бірден бүйірге не артқа шық.','Мақсат — жол ашып, кету.'],
+    avoid:['Клинчке, қабырғаға жабыспа.','Жоғары тебіс жасама.'],gym:'Бокс, кикбоксинг немесе муай тай'},
+ P:{name:'Жақын арақашықтық қысымшысы',short:'Жақын қысым',idea:'Қашықтықты тез жауып, қысқа соққылармен жұмыс істейсің: хук, апперкот, шынтақ.',
+    plan:['Ұзын қашықтықта тұрма. Слиппен ішке кір.','Ішінде: хук, апперкот, шынтақ — 2–3 соққы.','Сосын бірден шық немесе клинчке ауыс.'],
+    avoid:['Ұзын қашықтықта соққы алмаспа.','Басты төмен салып, көрмей кірме.'],gym:'Бокс немесе муай тай'},
+ C:{name:'Клинч бақылаушысы',short:'Клинч бақылау',idea:'Салмақ пен күшті пайдаланып, қарсыласты ұстап басқарасың, өзің аяқта қаласың.',
+    plan:['Жақындаса — басын не қолтығын бақыла.','Клинчте тізе мен қысқа шынтақ.','Итеріп жібер де, кет. Жерге түспе.'],
+    avoid:['Жерде күреспе: бетон, шыны, басқалар.','Тек күшке сенбе: 30 секундта шаршайсың.'],gym:'Күрес, дзюдо немесе самбо + бокс'},
+ E:{name:'Қозғалғыш контршы',short:'Қозғалғыш контр',idea:'Жылдамдық пен аяқ жұмысы: шабуылды бос жіберіп, бірден жауап беріп, кетесің.',
+    plan:['Ол соққанда — шегін немесе слип.','Бос кеткен сәтте — бірден кросс.','Бір орында тұрма, қайта шық.'],
+    avoid:['Ауыр қарсыласпен клинчке түспе.','Қабырғаға шегінбе.'],gym:'Бокс + дзюдо немесе BJJ'}
+};
+function scoreArch(d,m){
+  const z=m.z,bg=d.bg;
+  const s={
+    R:50+9*z.tall+8*z.ape+6*z.leg-4*z.mass+2*z.fit+(bg==='strike'?6:0)+(bg==='mixed'?3:0),
+    P:50-7*z.tall-7*z.ape+6*z.mass+5*z.fit-3*z.leg+(bg==='strike'?4:0)+(bg==='mixed'?3:0)+3*z.age,
+    C:50+9*z.mass-3*z.tall+2*z.fit+(bg==='grap'?14:0)+(bg==='mixed'?6:0)-(d.back?8:0)+2*z.age,
+    E:50-9*z.mass+8*z.fit+6*z.age+2*z.leg+5*z.light-2*z.tall
+  };
+  if(d.sex==='f'){s.C-=6;s.E+=4;s.R+=2}
+  Object.keys(s).forEach(k=>s[k]=clamp(r0(s[k]),5,98));
+  return Object.entries(s).sort((a,b)=>b[1]-a[1]);
+}
+function reasons(d,m){
+  const out=[],z=m.z;
+  if(m.ape>=3) out.push(`Қол құлашың бойыңнан ${sgn(m.ape)} см ұзын — соққы қашықтығында артықшылық.`);
+  else if(m.ape<=-3) out.push(`Қол құлашың бойыңнан ${sgn(m.ape)} см қысқа — жақын арақашықтыққа кіруді үйрен.`);
+  else out.push(`Қол құлашың бойыңмен шамалас (${sgn(m.ape)} см).`);
+  if(z.tall>=1) out.push(`Бойың орташадан (${m.hn} см) жоғары: қашықтық ұстау табиғи.`);
+  if(z.tall<=-1) out.push(`Бойың орташадан (${m.hn} см) төмен: ауырлық орталығың төмен, клинчке ыңғайлы.`);
+  if(z.leg>=1) out.push(`Аяғың ұзын (${(m.legR*100).toFixed(1)}% бойдан): итеру тебісі — басты құралың.`);
+  if(z.leg<=-1) out.push(`Аяғың қысқа (${(m.legR*100).toFixed(1)}% бойдан): тұрақтысың, құлату қиын.`);
+  if(z.mass>=1) out.push(`Дене массасы индексі ${m.bmi.toFixed(1)}: салмақ клинчте көмектеседі, шыдамдылыққа көңіл бөл.`);
+  if(z.mass<=-1||z.light) out.push('Салмағың жеңіл: ауыр адаммен күштеспе, қозғалыс — сенің құралың.');
+  if(d.fit===3) out.push('Дайындығың жоғары: қысымды және қозғалғыш стильге шыдамың жетеді.');
+  if(d.fit===1) out.push('Дайындығың төмен: алғашқы 4 апта — шыдамдылық басым.');
+  if(d.bg==='grap') out.push('Күрес тәжірибең — клинчтегі базаң.');
+  if(d.bg==='strike') out.push('Соққы тәжірибеңді көшеге бейімде: қолғап жоқ, орын тар.');
+  return out;
+}
+
+/* ================= Technique text ================= */
+const T=[
+ {id:'fence',n:'Қоршау позициясы',c:'Алдын алу',base:30,w:{R:2,P:2,C:2,E:2},
+  s:['Қолдар алда, алақан ашық: «Тоқта, маған керегі жоқ».','Алдыңғы қол — қашықтық өлшегіш: ол одан ары өтпеуі керек.','Итерсе немесе ұмтылса — бұл шабуыл белгісі.','Барлық соққы мен шегініс осы позициядан басталады.'],
+  e:'Қолды түсіріп, жұдырық түйіп тұру: қақтығыс күшейеді, кешігесің.',dose:'Әр жаттығуда 5 мин серіктеспен'},
+ {id:'stance',n:'Тұрыс және гард',c:'Негіз',base:28,w:{R:2,P:2,C:2,E:2},
+  s:['Аяқ иық енінен сәл кең, әлсіз жақ аяқ алда.','Тізе сәл бүгулі, салмақ екі аяққа тең.','Қол бет алдында, шынтақ қабырғаға жақын, иек төмен.'],
+  e:'Аяқты бір сызыққа қою: итерсе құлайсың.',dose:'3 × 2 мин айна алдында'},
+ {id:'foot',n:'Қадам жүрісі',c:'Қозғалыс',base:22,w:{R:3,P:1,C:0,E:4},
+  s:['Алға: алдыңғы аяқ, артынан артқы аяқ сырғиды.','Артқа: артқы аяқ бірінші.','Аяқ арасы әрдайым бірдей.'],
+  e:'Аяқты айқастыру немесе секіру.',dose:'4 × 2 мин'},
+ {id:'jab',n:'Джеб',c:'Соққы',base:10,w:{R:5,P:1,C:0,E:3},ape:3,
+  s:['Гардтан тура алға, иық иекті жабады.','Жұдырық соққы сәтінде ғана түйіледі.','Сол сызықпен бет алдына қайт.'],
+  e:'Қолды төмен түсіріп қайтару.',dose:'Қапқа 5 × 2 мин'},
+ {id:'cross',n:'Кросс',c:'Соққы',base:14,w:{R:4,P:3,C:1,E:3},
+  s:['Артқы аяқ өкшесі көтеріліп, жамбас бұрылады.','Қол тура сызықпен, алдыңғы қол бетте.','Тез гардқа қайт.'],
+  e:'Қолды кең сермеу.',dose:'Джебпен 1–2: 5 × 2 мин'},
+ {id:'palm',n:'Алақан соққысы',c:'Соққы',base:20,w:{R:2,P:2,C:2,E:2},
+  s:['Саусақ артқа, соққы алақан түбімен.','Иекке төменнен жоғары.','Қолғапсыз жұдырықтан қауіпсіз: саусақ сүйегі сынбайды.'],
+  e:'Білекті бүгіп ұру.',dose:'Ұстағышқа 4 × 1 мин'},
+ {id:'hook',n:'Хук',c:'Соққы',base:8,w:{R:1,P:5,C:2,E:2},ape:-3,
+  s:['Шынтақ 90°, қол иық деңгейінде.','Күш жамбас бұрылысынан.','Тек жақын қашықтықта.'],
+  e:'Қолды кең «шалғымен» сермеу.',dose:'Қапқа 4 × 2 мин'},
+ {id:'upper',n:'Апперкот',c:'Соққы',base:6,w:{R:0,P:5,C:2,E:1},ape:-2,
+  s:['Тізе бүгіліп, сәл төмен түс.','Аяқпен итеріліп, төменнен иекке.','Шынтақ денеге жақын.'],
+  e:'Ұрар алдында қолды түсіріп көрсету.',dose:'Қапқа 3 × 2 мин'},
+ {id:'elbow',n:'Шынтақ',c:'Соққы',base:6,w:{R:0,P:4,C:4,E:1},sh:true,
+  s:['Тек өте жақын қашықтықта.','Шынтақ иық деңгейінде, дене бұрылысымен.','Сосын шық немесе клинчке ауыс.'],
+  e:'Алыстан шынтақпен ұмтылу.',dose:'Ұстағышқа 3 × 1 мин'},
+ {id:'knee',n:'Клинчтегі тізе',c:'Клинч',base:6,w:{R:0,P:3,C:5,E:0},knee:true,
+  s:['Басын екі қолмен басқар.','Өзіңе тартып, жамбасты алға — тізе денеге.','Тірек аяқтың өкшесі көтеріледі.'],
+  e:'Артқа шалқайып, тепе-теңдікті жоғалту.',dose:'Қапқа 3 × 1 мин әр аяқпен'},
+ {id:'teep',n:'Итеру тебісі',c:'Тебіс',base:8,w:{R:5,P:0,C:0,E:3},leg:4,knee:true,
+  s:['Тізе кеудеге.','Табанмен итер: іш немесе сан.','Аяқты тез қайтар.'],
+  e:'Аяқты ұзақ ұстап тұру: ұстап алады.',dose:'Қапқа 3 × 10 әр аяқпен'},
+ {id:'low',n:'Төмен тебіс',c:'Тебіс',base:5,w:{R:4,P:2,C:0,E:1},leg:2,knee:true,
+  s:['Алдыңғы аяқ сәл алға-бүйірге.','Жамбасты бұрып, жіліншікпен санның сыртына.','Жамбастан жоғары тебуге болмайды.'],
+  e:'Табанмен немесе башпаймен тебу.',dose:'Қапқа 3 × 10'},
+ {id:'slip',n:'Слип',c:'Қорғаныс',base:8,w:{R:2,P:4,C:0,E:5},
+  s:['Тізе бүгіліп, бас соққы сызығынан шығады.','Көзді алма.','Бірден қарсы соққы.'],
+  e:'Белден еңкейіп, көзді жұму.',dose:'Серіктеспен 3 × 2 мин'},
+ {id:'cover',n:'Қорғаныс қақпағы',c:'Қорғаныс',base:16,w:{R:2,P:3,C:2,E:3},
+  s:['Кенет шабуылда екі қол басқа, шынтақ алға.','Иек төмен.','Сосын кір немесе шық.'],
+  e:'Көзді жұмып, орнында тұру.',dose:'Серіктес жеңіл соғады: 3 × 1 мин'},
+ {id:'under',n:'Андерхук',c:'Клинч',base:8,w:{R:1,P:3,C:5,E:2},
+  s:['Қол қолтығының астынан, алақан жауырынға.','Бас иек астына тіреледі.','Көтеріп, итеріп тепе-теңдігін ал.'],
+  e:'Қолды мойнына орау.',dose:'Серіктеспен 4 × 1 мин'},
+ {id:'sprawl',n:'Спрол',c:'Клинч',base:12,w:{R:2,P:2,C:4,E:2},back:true,knee:true,
+  s:['Ол аяғыңа ұмтылса — аяқты артқа лақтыр.','Жамбас төмен, салмақ оның арқасында.','Тұр да, қашықтыққа шық.'],
+  e:'Тізеге құлау.',dose:'5 × 5'},
+ {id:'head',n:'Бас құшақтаудан шығу',c:'Босану',base:14,w:{R:2,P:2,C:3,E:2},
+  s:['Иек төмен — тыныс жолын қорға.','Бір қол оның арқасында, екіншісі итереді.','Артқа шегініп, басты шығар.'],
+  e:'Басты күшпен тартып шығару.',dose:'5 × әр жаққа'},
+ {id:'wrist',n:'Ұстаудан босану',c:'Босану',base:14,w:{R:2,P:2,C:2,E:3},
+  s:['Қолды оның бас бармағына қарай бұрып тарт.','Босанған сәтте шегін.','Гардқа тұр.'],
+  e:'Күшпен тура тарту.',dose:'5 × әр нұсқа'},
+ {id:'getup',n:'Жерден тұру',c:'Жер',base:18,w:{R:2,P:2,C:2,E:3},
+  s:['Бір қол бетте, екіншісі тірек.','Аяқпен итеріп қашықтық жаса.','Жамбасты көтеріп, аяқты артқа әкел.','Гардпен тұр.'],
+  e:'Арқамен бұрылып тұру.',dose:'2 × 10 әр жаққа'},
+ {id:'fall',n:'Қауіпсіз құлау',c:'Жер',base:14,w:{R:1,P:1,C:2,E:2},back:true,
+  s:['Иек кеудеге.','Арқаның жоғарғы бөлігімен домала.','Алақанмен еденді соқ.'],
+  e:'Қолды тік созып құлау.',dose:'Жұмсақ төсеніште 3 × 10'}
+];
+function rankTech(d,m,arch){
+  const p=arch[0][0],s=arch[1][0],z=m.z;
+  return T.map(t=>{
+    let sc=t.base+t.w[p]*6+t.w[s]*3;
+    if(t.ape) sc+=t.ape*z.ape;
+    if(t.leg) sc+=t.leg*z.leg;
+    if(d.exp===0&&t.c==='Негіз') sc+=6;
+    if(d.exp===0&&(t.id==='upper'||t.id==='elbow')) sc-=4;
+    const adapt=[];
+    if(d.knee&&t.knee){sc-=10;adapt.push('Тізе: амплитуданы азайт, тебісті тек белден төмен және жеңіл жаса.');}
+    if(d.back&&t.back){sc-=8;adapt.push('Бел: тек жұмсақ төсеніште, баяу, жаттықтырушымен.');}
+    if(d.sh&&(t.sh||t.c==='Соққы')) adapt.push('Иық/білек: 50% күшпен баста, жұдырық орнына алақан.');
+    return {...t,score:sc,adapt};
+  }).sort((a,b)=>b.score-a.score);
+}
+
+/* ================= Animation library =================
+   Units: hx, lf, rf — inseam lengths (x from rear foot, lift); hand targets — arm lengths from shoulder (x forward, y down);
+   t — torso lean°, tw — shoulder twist, cr — crouch. Strings attach to the other figure. */
+const G={hx:.3,cr:.06,t:8,tw:.45,L:[.42,-.12],R:[.25,-.15],Le:1,Re:1,Lp:0,Rp:0,lf:[.62,0],rf:[0,0],lfo:'auto',rfo:'auto',Lz:.06,Rz:-.05,Lf:.03,Rf:.03,hz:0,lz:.06,rz:-.08};
+const REL={...G,cr:0,t:0,tw:.15,L:[.05,.97],R:[.03,.97],lf:[.42,0],rf:[.2,0],Lz:.14,Rz:-.14,Lf:0,Rf:0,lz:.05,rz:-.05};
+const JAB={hx:.36,t:12,tw:.85,L:[1,-.03],Lz:0};
+const CROSS={hx:.42,t:14,tw:-.3,R:[1,-.03],L:[.3,-.2],rf:[.03,.06],Rz:0,Lz:.07};
+const SLIP={cr:.25,t:14,tw:.7,hx:.28,L:[.4,-.12],R:[.22,-.14],hz:-.09};
+const COVER={cr:.1,t:16,tw:.4,L:[.2,-.38],R:[.12,-.4],Lz:.08,Rz:-.08,Lf:.07,Rf:.07};
+const FENCE={...G,hx:.28,cr:.04,t:3,tw:.3,L:[.8,-.18],R:[.5,-.1],Lp:1,Rp:1,Lz:.05,Rz:-.04};
+const CL={hx:.32,t:12,tw:.3,L:'o.neck',R:'o.neck'};
+const OCL={...G,t:18,cr:.08,L:[.5,.15],R:[.4,.2]};
+const KNEE={t:-5,hx:.36,rf:[.45,.42],rfo:55,rz:-.01};
+const JABo={...G,...JAB};
+const SHOOT={...G,cr:.38,t:55,hx:.62,lf:[1.05,0],rf:[.25,0],L:[.7,.5],R:[.7,.55]};
+const SIT={...G,hx:.3,cr:.86,t:-35,tw:.3,R:{g:-.5},L:[.4,-.3],lf:[1.0,.15],lfo:-50,rf:[.45,0],rfo:'auto'};
+
+const ANIM={
+ stance:{caps:['Бос тұрыс','Әлсіз жақ аяқ алда','Қол бетте, иек төмен','Тізе сәл бүгулі, серпінді'],k:[
+  {...REL,d:500,h:700,c:0},{rf:[0,0],lf:[.62,0],hx:.3,cr:.03,tw:.4,L:[.2,.6],R:[.15,.6],d:450,c:1},{...G,d:400,h:300,c:2},{cr:.12,d:300,c:3},{cr:.06,d:300,h:700,c:3}]},
+ fence:{opp:{at:'gap',gap:.5},caps:['Ол жақындап келеді','Алақан алға: «Тоқта»','Ұмтылса — шегін, қашықтық сақта'],k:[
+  {...REL,o:{...REL},od:90,d:700,h:300,c:0},{o:{...REL,t:10},od:10,d:1000,c:0},{...FENCE,d:300,h:500,c:1},{o:{...REL,t:16},od:-6,d:450,c:2},{...FENCE,hx:0,lf:[.27,0],rf:[-.32,0],d:350,h:700,c:2}]},
+ foot:{caps:['Алдыңғы аяқ алға','Артқы аяқ сырғиды','Артқа: артқы аяқ бірінші','Алдыңғы аяқ соңынан'],k:[
+  {...G,d:400,h:350,c:0},{lf:[.86,.04],hx:.38,d:180,c:0},{lf:[.86,0],hx:.46,d:100,c:0},{rf:[.24,.03],hx:.54,d:180,c:1},{rf:[.24,0],d:80,h:350,c:1},
+  {rf:[0,.03],hx:.42,d:180,c:2},{rf:[0,0],d:80,c:2},{lf:[.62,.03],hx:.3,d:180,c:3},{lf:[.62,0],d:80,h:400,c:3}]},
+ jab:{bag:1,caps:['Гард','Тура алға, иық иекті жабады','Сол сызықпен гардқа'],k:[
+  {...G,d:400,h:500,c:0},{...G,...JAB,hit:'Lh',d:120,h:70,c:1,e:'out'},{...G,d:180,h:600,c:2}]},
+ cross:{bag:1,caps:['Гард','Өкше көтеріліп, жамбас бұрылады','Тез гардқа'],k:[
+  {...G,d:400,h:500,c:0},{...G,...CROSS,hit:'Rh',d:150,h:70,c:1,e:'out'},{...G,d:200,h:600,c:2}]},
+ palm:{bag:1,caps:['Гард','Алақан түбімен, төменнен жоғары','Гардқа қайт'],k:[
+  {...G,d:400,h:500,c:0},{...G,...CROSS,R:[.93,-.15],Rp:1,hit:'Rh',d:150,h:90,c:1,e:'out'},{...G,d:220,h:600,c:2}]},
+ hook:{opp:{at:'head'},caps:['Гард','Шынтақ иық деңгейіне','Жамбас бұрылысымен бүйірден','Гардқа'],k:[
+  {...G,d:400,h:500,c:0},{...G,tw:.65,t:10,L:[.4,-.15],Lz:.16,Lf:.11,d:120,c:1},{...G,hx:.36,tw:-.2,t:10,L:[.55,-.05],Lz:-.03,Lf:.13,Le:-1,hit:'Lh',o:{...G,t:-8},d:130,h:80,c:2,e:'out'},{...G,d:220,h:600,c:3}]},
+ upper:{opp:{at:'head'},caps:['Гард','Тізе бүгіліп, төмен түс','Аяқпен итеріліп, төменнен иекке','Гардқа'],k:[
+  {...G,d:400,h:500,c:0},{...G,cr:.15,t:16,tw:.3,R:[.25,-.05],Rz:-.07,d:220,c:1},{...G,cr:.02,t:2,tw:-.15,hx:.36,R:[.5,-.3],Rz:-.01,Rf:0,hit:'Rh',o:{...G,t:-10},d:150,h:80,c:2,e:'out'},{...G,d:220,h:600,c:3}]},
+ elbow:{opp:{at:'head'},caps:['Гард','Тек өте жақын қашықтықта','Шынтақ көлденең, дене бұрылады','Гардқа'],k:[
+  {...G,d:400,h:500,c:0},{...G,tw:.7,L:[.3,-.25],Lz:.1,Lf:.16,d:120,c:1},{...G,hx:.36,tw:-.25,t:10,L:[.02,-.15],Lz:-.1,Lf:.02,hit:'Lel',o:{...G,t:-8},d:140,h:90,c:2,e:'out'},{...G,d:220,h:600,c:3}]},
+ knee:{opp:{at:'gap',gap:.22},caps:['Басын екі қолмен басқар','Өзіңе тартып, тізе денеге','Клинчке қайт'],k:[
+  {...G,...CL,o:{...OCL},d:500,h:400,c:0},{...G,...CL,...KNEE,hit:'rk',o:{...OCL,t:32,cr:.12},d:220,h:120,c:1,e:'out'},{...G,...CL,o:{...OCL},d:250,h:500,c:2}]},
+ teep:{bag:1,caps:['Гард','Тізе кеудеге','Табанмен итер','Тез қайтар'],k:[
+  {...G,d:400,h:500,c:0},{...G,hx:.24,t:-4,lf:[.8,.45],lfo:-60,d:180,c:1},{...G,hx:.36,t:-14,lf:[1.6,.62],lfo:-85,hit:'la',d:130,h:90,c:2,e:'out'},
+  {...G,hx:.24,t:-4,lf:[.8,.45],lfo:-60,d:150,c:3},{...G,d:200,h:600,c:3}]},
+ low:{bag:1,caps:['Гард','Алдыңғы аяқ сәл алға','Жамбасты бұрып, жіліншікпен санға','Гардқа'],k:[
+  {...G,d:400,h:500,c:0},{...G,hx:.38,lf:[.75,0],d:150,c:1},{...G,hx:.5,t:-12,tw:-.6,lf:[.75,0],rf:[1.5,.42],rfo:8,rz:.04,R:[.05,.6],L:[.4,-.35],hit:'ra',d:200,h:80,c:2,e:'out'},
+  {...G,hx:.38,lf:[.75,0],rf:[.25,.15],d:200,c:3},{...G,d:200,h:600,c:3}]},
+ slip:{opp:{at:'reachme'},caps:['Гард','Ол соғады — бас төмен-алға','Бірден қарсы соққы','Гардқа'],k:[
+  {...G,o:{...G},d:500,h:500,c:0},{...G,...SLIP,o:JABo,ohit:'Lh',om:1,d:150,h:150,c:1,e:'out'},{...G,...CROSS,o:{...G,t:-8},hit:'Rh',d:160,h:90,c:2,e:'out'},{...G,o:{...G},d:260,h:600,c:3}]},
+ cover:{opp:{at:'reachme'},caps:['Гард','Кенет соққы: екі қол басқа, иек төмен','Сосын шық'],k:[
+  {...G,o:{...G},d:500,h:500,c:0},{...G,...COVER,o:{...G,...CROSS},ohit:'Rh',d:150,h:260,c:1,e:'out'},
+  {...G,...COVER,hx:.02,lf:[.36,0],rf:[-.26,0],o:{...G},d:300,h:250,c:2},{...G,hx:.02,lf:[.36,0],rf:[-.26,0],d:250,h:500,c:2}]},
+ under:{opp:{at:'gap',gap:.15},caps:['Клинч','Қол қолтықтың астынан, жауырынға','Көтеріп, итеріп тепе-теңдігін ал'],k:[
+  {...G,t:14,tw:.3,L:[.55,-.05],R:'o.chest',Rp:1,o:{...G,t:10,L:[.45,.1],R:[.4,.1]},od:0,d:500,h:500,c:0},
+  {L:'o.back',t:20,hx:.38,d:320,h:250,c:1},
+  {L:'o.back',t:8,hx:.52,cr:.03,lf:[.82,0],rf:[.2,0],o:{...G,t:-16,L:[.45,.1],R:[.4,.1]},od:22,d:380,h:450,c:2}]},
+ sprawl:{opp:{at:'gap',gap:.2},caps:['Ол аяғыңа ұмтылады','Аяқты артқа лақтыр, жамбас төмен','Тұр да, қашықтыққа шық'],k:[
+  {...G,o:{...G},od:50,d:600,h:400,c:0},{o:SHOOT,od:0,d:300,c:0},
+  {...G,hx:-.35,cr:.55,t:65,tw:.3,L:'o.back',R:'o.neck',lf:[-.9,.06],rf:[-1.1,.06],d:200,h:550,c:1,e:'out'},
+  {...G,hx:-.45,lf:[-.12,0],rf:[-.75,0],o:{...SHOOT,t:62,cr:.45},d:380,h:250,c:2},{...G,hx:-.45,lf:[-.12,0],rf:[-.75,0],o:{...G},od:50,d:450,h:400,c:2}]},
+ head:{opp:{at:'gap',gap:.05,oz:.17},caps:['Иек төмен, тынысты қорға','Бір қол арқасына, бірі итереді','Артқа шегініп, басты шығар'],k:[
+  {...G,cr:.18,t:42,tw:.2,hz:.05,L:[.45,.25],R:[.35,.3],o:{...G,t:12,cr:.05,tw:.1,L:'u.neck',R:'u.head'},d:500,h:500,c:0},
+  {L:'o.back',R:'o.head',Rp:1,d:300,h:300,c:1},
+  {hx:-.25,lf:[.25,0],rf:[-.4,0],t:22,cr:.1,hz:-.06,o:{...G,t:4,cr:.05,tw:.1,L:'u.neck',R:'u.head'},d:380,c:2},
+  {...G,hx:-.3,lf:[.28,0],rf:[-.38,0],o:{...G,t:6,L:[.5,.25],R:[.4,.25]},d:320,h:600,c:2}]},
+ wrist:{opp:{at:'gap',gap:.3},caps:['Білегіңді ұстады','Бас бармағына қарай бұрып тарт','Босандың — шегін','Гард, қашықтық'],k:[
+  {...G,L:[.6,.15],o:{...G,L:'u.Lh'},d:500,h:600,c:0},{...G,L:[.42,-.3],tw:.2,o:{...G,L:'u.Lh'},d:220,h:150,c:1,e:'out'},
+  {...G,L:[.3,-.35],hx:.12,lf:[.42,0],rf:[-.2,0],o:{...G,L:[.55,.05]},d:220,h:300,c:2},{...G,hx:.08,lf:[.4,0],rf:[-.22,0],o:{...G},d:250,h:500,c:3}]},
+ getup:{caps:['Қол бетте, екінші қол тірек','Аяқпен итеріп, қашықтық жаса','Жамбасты көтеріп, аяқты артқа','Гардпен тұр'],k:[
+  {...SIT,d:600,h:500,c:0},{...SIT,lf:[1.25,.4],lfo:-70,d:200,h:200,c:1,e:'out'},{...SIT,d:200,c:1},
+  {...SIT,hx:.1,cr:.55,t:-5,lf:[-.35,.05],lfo:'auto',d:380,c:2},{...G,hx:-.15,lf:[.35,0],rf:[-.27,0],d:380,h:600,c:3}]},
+ fall:{caps:['Бос тұрыс','Отыр, иек кеудеге','Арқаға домала, алақанмен еденді соқ','Тұр'],k:[
+  {...REL,d:600,h:500,c:0},{...REL,cr:.55,t:30,L:[.6,.2],R:[.55,.25],lf:[.42,0],rf:[.18,0],d:450,c:1},{hx:.15,cr:.88,t:-30,d:300,c:1},
+  {hx:.2,cr:.93,t:-80,L:{g:.1},R:{g:-.05},Lp:1,Rp:1,lf:[.55,.55],rf:[.4,.65],lfo:-40,rfo:-40,d:280,h:450,c:2,e:'out'},
+  {hx:.15,cr:.88,t:-30,L:[.5,-.2],R:[.4,-.2],Lp:0,Rp:0,lf:[.5,0],rf:[.3,0],lfo:'auto',rfo:'auto',d:450,c:3},{...REL,d:600,h:300,c:3}]},
+ planR:{opp:{at:'head'},caps:['Ол жақындайды','Сенің шекараңда — джеб','Шегін: қашықтық сенікі'],k:[
+  {...G,o:{...G},od:80,d:600,h:300,c:0},{o:{...G,t:12},od:5,d:800,c:0},{...G,...JAB,hit:'Lh',o:{...G,t:-6},d:120,h:90,c:1,e:'out'},
+  {...G,o:{...G,t:4},od:12,d:200,c:1},{...G,hx:0,lf:[.32,0],rf:[-.3,0],o:{...G},od:45,d:380,h:600,c:2}]},
+ planP:{opp:{at:'reachme'},caps:['Гард','Слиппен ішке кір','Хук + апперкот','Шық'],k:[
+  {...G,o:{...G},d:500,h:400,c:0},{...G,...SLIP,o:JABo,ohit:'Lh',om:1,d:150,h:120,c:1,e:'out'},
+  {...G,hx:.85,lf:[1.17,0],rf:[.55,0],cr:.1,t:14,tw:.5,L:[.38,-.3],R:[.2,-.32],o:{...G},d:260,c:1},
+  {hx:.9,tw:-.2,t:12,L:[.55,-.05],Lz:-.03,Lf:.13,Le:-1,hit:'Lh',o:{...G,t:-8},d:130,h:80,c:2,e:'out'},
+  {hx:.86,cr:.03,tw:-.15,L:[.35,-.35],Lz:.06,Lf:.03,Le:1,R:[.5,-.3],Rz:-.01,Rf:0,hit:'Rh',o:{...G,t:-16},d:150,h:100,c:2,e:'out'},
+  {...G,o:{...G},d:450,h:400,c:3}]},
+ planC:{opp:{at:'gap',gap:.22},caps:['Ол жақындайды','Клинч: басын бақыла, тізе','Итеріп жібер де, кет'],k:[
+  {...G,o:{...G},od:70,d:600,h:300,c:0},{o:{...OCL},od:0,d:700,c:0},{...G,...CL,d:250,h:200,c:1},
+  {...G,...CL,...KNEE,hit:'rk',o:{...OCL,t:32,cr:.12},d:220,h:120,c:1,e:'out'},{...G,...CL,o:{...OCL},d:220,c:1},
+  {...G,L:'o.chest',R:'o.chest',Lp:1,Rp:1,tw:.1,hx:.4,o:{...G,t:-10},od:35,d:250,h:150,c:2,e:'out'},
+  {...G,hx:0,lf:[.32,0],rf:[-.3,0],o:{...G},od:60,d:350,h:500,c:2}]},
+ planE:{opp:{at:'reachme'},caps:['Гард','Ол соғады — сен шегінесің','Бос кетті — бірден кросс','Қайта шық'],k:[
+  {...G,o:{...G},d:500,h:400,c:0},{...G,hx:.02,lf:[.36,0],rf:[-.26,0],t:4,o:JABo,ohit:'Lh',om:1,d:170,h:100,c:1,e:'out'},
+  {...G,...CROSS,o:{...G,t:-8},hit:'Rh',d:170,h:90,c:2,e:'out'},{...G,hx:-.08,lf:[.3,0],rf:[-.32,0],o:{...G},d:320,h:500,c:3}]}
+};
+
+/* ================= Engine ================= */
+function dimsOf(h,ws,ins){const ankle=0.04*h,hipH=ins+0.05*h,arm=(ws-0.25*h)/2;
+  return {H:h,ins,ankle,hipH,thigh:(hipH-ankle)/2,shin:(hipH-ankle)/2,torso:0.82*h-hipH,nh:0.105*h,hr:0.062*h,arm,up:0.45*arm,lo:0.55*arm,shW:0.24*h,hipW:0.16*h,foot:0.14*h};}
+const NUM=['hx','cr','t','tw','Le','Re','Lp','Rp','Lz','Rz','Lf','Rf','hz','lz','rz'];
+function footAng(f,fo,D){if(fo==='auto'||fo==null){return Math.asin(Math.min(1,(D.ankle+f[1]*D.ins)/D.foot));}return fo*D2R;}
+function mix(A,B,u,D){
+  const P={};NUM.forEach(k=>P[k]=lerp(A[k]??0,B[k]??0,u));
+  P.lf=[lerp(A.lf[0],B.lf[0],u),lerp(A.lf[1],B.lf[1],u)];P.rf=[lerp(A.rf[0],B.rf[0],u),lerp(A.rf[1],B.rf[1],u)];
+  P.lfa=lerp(footAng(A.lf,A.lfo,D),footAng(B.lf,B.lfo,D),u);P.rfa=lerp(footAng(A.rf,A.rfo,D),footAng(B.rf,B.rfo,D),u);
+  P.Ls=[A.L,B.L];P.Rs=[A.R,B.R];P.u=u;return P;
+}
+function ik(S,Tg,a,b,s){
+  const dx=Tg[0]-S[0],dy=Tg[1]-S[1];let d=Math.hypot(dx,dy);const phi=Math.atan2(dy,dx);
+  d=clamp(d,Math.abs(a-b)+0.01,a+b-0.001);
+  const al=Math.acos(clamp((a*a+d*d-b*b)/(2*a*d),-1,1));const ang=phi+s*al;
+  const J=[S[0]+a*Math.cos(ang),S[1]+a*Math.sin(ang)];
+  const a2=Math.atan2(Tg[1]-J[1],Tg[0]-J[0]);
+  return [J,[J[0]+b*Math.cos(a2),J[1]+b*Math.sin(a2)]];
+}
+/* x — depth (forward), y — height, z — lateral (+ = lead side). Opponent faces the other way: dir=-1 mirrors x and z. */
+const Wd=(b,p)=>[b.ox+b.dir*p[0],p[1]];
+const Lc=(b,w)=>[(w[0]-b.ox)*b.dir,w[1]];
+const Wz=(b,name)=>b.oz+b.dir*b.z[name];
+const c1=v=>Math.sqrt(Math.max(0,1-v*v));
+function torso(P,D,ox,dir,oz){
+  const b={P,D,ox,dir,oz:oz||0,p:{},z:{}},p=b.p,z=b.z;
+  const hx=P.hx*D.ins;let hy=-(D.hipH*(1-P.cr));const LL=D.thigh+D.shin;
+  [P.lf,P.rf].forEach(f=>{if(f[1]<0.03){const dx=f[0]*D.ins-hx,ay=-(D.ankle+f[1]*D.ins);if(Math.abs(dx)<LL*0.999)hy=Math.max(hy,ay-Math.sqrt(LL*LL-dx*dx)*0.997);}});
+  const t=P.t*D2R;p.root=[hx,hy];
+  p.neck=[hx+D.torso*Math.sin(t),hy-D.torso*Math.cos(t)];
+  const th=t*0.75;p.head=[p.neck[0]+D.nh*Math.sin(th),p.neck[1]-D.nh*Math.cos(th)];
+  p.sL=[p.neck[0]+P.tw*D.shW/2,p.neck[1]];p.sR=[p.neck[0]-P.tw*D.shW/2,p.neck[1]];
+  const ht=P.tw*0.5;p.hL=[hx+ht*D.hipW/2,hy];p.hR=[hx-ht*D.hipW/2,hy];
+  p.chest=[lerp(hx,p.neck[0],.65),lerp(hy,p.neck[1],.65)];
+  p.back=[p.neck[0]-0.07*D.H*Math.cos(t)-0.06*D.H*Math.sin(t),p.neck[1]-0.07*D.H*Math.sin(t)+0.06*D.H*Math.cos(t)];
+  const hz=P.hz*D.H;
+  z.root=0;z.hL=D.hipW/2*c1(ht);z.hR=-z.hL;z.neck=hz*0.55;z.head=hz;z.chest=hz*0.3;z.back=z.neck;
+  z.sL=z.neck+D.shW/2*c1(P.tw);z.sR=z.neck-D.shW/2*c1(P.tw);
+  return b;
+}
+function resolve(spec,b,sh,other){
+  const D=b.D;
+  if(Array.isArray(spec)) return [sh[0]+spec[0]*D.arm,sh[1]+spec[1]*D.arm];
+  if(spec&&spec.g!=null) return [sh[0]+spec.g*D.arm,-D.ankle*0.35];
+  if(spec&&spec.w) return [spec.w[0],spec.w[1]];
+  if(typeof spec==='string'){
+    const pt=spec.split('.')[1];
+    if(!other) return [sh[0]+.38*D.arm,sh[1]-.3*D.arm];
+    const wp=other.p[pt]; if(!wp) return null;
+    return Lc(b,Wd(other,wp));
+  }
+  return [sh[0]+.38*D.arm,sh[1]-.3*D.arm];
+}
+function resolveZ(spec,b,other,pz){
+  if(typeof spec==='string'&&other){const pt=spec.split('.')[1];if(other.z[pt]==null)return pz;return (Wz(other,pt)-b.oz)*b.dir;}
+  return pz;
+}
+function arms(b,other,force){
+  const D=b.D;
+  ['L','R'].forEach(sd=>{
+    if(b.p[sd+'h']) return;
+    const sh=b.p['s'+sd],sp=b.P[sd+'s'];
+    let ta=resolve(sp[0],b,sh,other),tb=resolve(sp[1],b,sh,other);
+    if(!ta||!tb){ if(!force) return; ta=ta||resolve(null,b,sh);tb=tb||resolve(null,b,sh);}
+    const u=b.P.u,T2=[lerp(ta[0],tb[0],u),lerp(ta[1],tb[1],u)];
+    const [J,E]=ik(sh,T2,D.up,D.lo,b.P[sd+'e']);b.p[sd+'el']=J;b.p[sd+'h']=E;
+    const pz=b.P[sd+'z']*D.H;const hz=lerp(resolveZ(sp[0],b,other,pz),resolveZ(sp[1],b,other,pz),u);
+    b.z[sd+'h']=hz;b.z[sd+'el']=lerp(b.z['s'+sd],hz,.5)+(sd==='L'?1:-1)*b.P[sd+'f']*D.H;
+  });
+}
+function legs(b){
+  const D=b.D,p=b.p,P=b.P,z=b.z;
+  [['l',p.hL,P.lf,P.lfa,'hL',P.lz,1],['r',p.hR,P.rf,P.rfa,'hR',P.rz,-1]].forEach(([s,hp,f,fa,hn,fz,sg])=>{
+    const A=[f[0]*D.ins,-(D.ankle+f[1]*D.ins)];const [K,An]=ik(hp,A,D.thigh,D.shin,-1);
+    p[s+'k']=K;p[s+'a']=An;p[s+'t']=[An[0]+D.foot*Math.cos(fa),An[1]+D.foot*Math.sin(fa)];
+    z[s+'a']=fz*D.H;z[s+'t']=z[s+'a'];z[s+'k']=lerp(z[hn],z[s+'a'],.5)+sg*0.012*D.H;
+  });
+}
+function compile(def,DU,DO){
+  let prev={...G,o:{...G},od:0,c:0};
+  const k=def.k.map(kf=>typeof kf==='function'?kf(DU):kf).map(kf=>{const f={...prev,...kf,o:{...prev.o,...(kf.o||{})}};
+    f.hit=kf.hit||0;f.ohit=kf.ohit||0;f.om=kf.om||0;f.d=kf.d??400;f.h=kf.h??0;f.e=kf.e||'io';f.c=kf.c??prev.c;prev=f;return f;});
+  const A={def,k,DU,DO,opp:!!def.opp,ox:0,oz:def.opp&&def.opp.oz?def.opp.oz*DU.H:0,bag:null,caps:def.caps};
+  A.total=k.reduce((s,x)=>s+x.d+x.h,0);
+  let acc=0;A.marks=k.map(x=>{acc+=x.d;const m=acc;acc+=x.h;return m;});
+  const solo=(kf)=>{const P=mix(kf,kf,1,DU);const b=torso(P,DU,0,1);arms(b,null,true);legs(b);return b;};
+  const oSolo=(kf)=>{const P=mix(kf.o,kf.o,1,DO);const b=torso(P,DO,0,-1);arms(b,null,true);legs(b);return b;};
+  if(def.opp){
+    const m=def.opp.at;
+    if(m==='head'){const hk=k.find(x=>x.hit);const ub=solo(hk);const cx=Wd(ub,ub.p[hk.hit])[0];const ob=oSolo(hk);A.ox=cx+ob.p.head[0]+DO.hr*0.85-hk.od;}
+    else if(m==='reachme'){const ok=k.find(x=>x.ohit);const ub=solo(k[0]);const ob=oSolo(ok);A.ox=ub.p.head[0]+DU.hr*0.5+ob.p[ok.ohit][0]-ok.od;}
+    else {const ub=solo(k[0]);const ob=oSolo({o:{...k[0].o}});A.ox=ub.p.chest[0]+def.opp.gap*DU.H+ob.p.chest[0];}
+  } else if(def.bag){
+    const hk=k.find(x=>x.hit);const ub=solo(hk);const w=Wd(ub,ub.p[hk.hit]);A.bag=w[0]+(hk.hit.endsWith('h')?0.02*DU.H:0.01*DU.H);
+    A.toe=solo(k[0]).p.lt[0];
+  }
+  // view bounds (side: x, front: z)
+  if(def.prop==='bar'){A.barY=def.barY(DU);A.barX=def.barX(DU);}
+  let x0=Infinity,x1=-Infinity,z0=Infinity,z1=-Infinity,ymin=0;
+  for(let i=0;i<40;i++){const fr=build(A,sample(A,A.total*i/40));[fr.u,fr.o].forEach(b=>{if(!b)return;
+    Object.keys(b.p).forEach(n=>{const w=Wd(b,b.p[n]);x0=Math.min(x0,w[0]);x1=Math.max(x1,w[0]);ymin=Math.min(ymin,w[1]);if(b.z[n]!=null){const zz=Wz(b,n);z0=Math.min(z0,zz);z1=Math.max(z1,zz);}});});}
+  if(A.bag!=null) x1=Math.max(x1,A.bag+0.22*DU.H);
+  const Hm=Math.max(DU.H,A.opp?DO.H:0);
+  const pad=0.1*Hm;x0-=pad;x1+=pad;const minW=1.55*Hm;
+  if(x1-x0<minW){const c=(x0+x1)/2;x0=c-minW/2;x1=c+minW/2;}
+  if(A.barY)ymin=Math.min(ymin,-A.barY-0.04*Hm);
+  const y0=Math.min(-(Hm*1.06),ymin-0.08*Hm);
+  A.view={x0,x1,y0,y1:0.13*Hm};
+  const zm=Math.max(Math.abs(z0),Math.abs(z1))+0.12*Hm,zw=Math.max(zm,0.55*Hm);
+  A.fview={x0:-zw,x1:zw,y0,y1:0.08*Hm};
+  return A;
+}
+function ease(u,e){u=clamp(u,0,1);if(e==='lin')return u;if(e==='out')return 1-Math.pow(1-u,3);return u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;}
+function sample(A,ms){
+  const n=A.k.length;let t=((ms%A.total)+A.total)%A.total;
+  for(let i=0;i<n;i++){const k=A.k[i];
+    if(t<k.d) return {a:A.k[(i-1+n)%n],b:k,u:ease(t/k.d,k.e),i,hold:false,ht:0};
+    t-=k.d; if(t<k.h||i===n-1) return {a:k,b:k,u:1,i,hold:true,ht:t};
+    t-=k.h;}
+}
+function build(A,s,ms){
+  const bob=(ms==null||A.def.calm)?0:Math.sin(ms/260)*0.012;
+  const PU=mix(s.a,s.b,s.u,A.DU);if(PU.cr<.3)PU.cr+=bob;const u=torso(PU,A.DU,0,1,0);u.mf=A.mf||1;let o=null;
+  if(A.opp){const PO=mix(s.a.o,s.b.o,s.u,A.DO);if(PO.cr<.3)PO.cr+=Math.sin(ms==null?0:ms/290+1)*0.01;o=torso(PO,A.DO,A.ox+lerp(s.a.od,s.b.od,s.u),-1,A.oz);o.mf=1;}
+  arms(u,o,false);if(o)arms(o,u,false);arms(u,o,false);if(o)arms(o,u,true);arms(u,o,true);
+  legs(u);if(o)legs(o);return {u,o};
+}
+
+/* ================= Drawing: volumetric human figure ================= */
+const cv=$('#cv'),cx=cv.getContext('2d');
+let CSSV={};
+function tokens(){const cs=getComputedStyle(document.documentElement);['ink','muted','line','accent','fig','fig-far','opp','bag','bag-line','flash','stage','z-clinch','z-punch','z-kick'].forEach(k=>CSSV[k]=cs.getPropertyValue('--'+k).trim());}
+function fitCanvas(){const dpr=Math.min(window.devicePixelRatio||1,2);const w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;
+  if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);}}
+function viewXf(v,padTop,padBot){const W=cv.width,H=cv.height-padTop-padBot;const k=Math.min(W/(v.x1-v.x0),H/(v.y1-v.y0));
+  const offX=(W-(v.x1-v.x0)*k)/2-v.x0*k, offY=padTop+H-v.y1*k-(H-(v.y1-v.y0)*k)/2;return {k,X:x=>offX+x*k,Y:y=>offY+y*k,offX};}
+function capsule(a,ra,b,rb){
+  cx.beginPath();cx.arc(a[0],a[1],ra,0,Math.PI*2);cx.fill();
+  cx.beginPath();cx.arc(b[0],b[1],rb,0,Math.PI*2);cx.fill();
+  const dx=b[0]-a[0],dy=b[1]-a[1],d=Math.hypot(dx,dy);if(d<=Math.abs(ra-rb)+0.01)return;
+  const an=Math.atan2(dy,dx),th=Math.acos(clamp((ra-rb)/d,-1,1));
+  cx.beginPath();
+  cx.moveTo(a[0]+ra*Math.cos(an+th),a[1]+ra*Math.sin(an+th));cx.lineTo(b[0]+rb*Math.cos(an+th),b[1]+rb*Math.sin(an+th));
+  cx.lineTo(b[0]+rb*Math.cos(an-th),b[1]+rb*Math.sin(an-th));cx.lineTo(a[0]+ra*Math.cos(an-th),a[1]+ra*Math.sin(an-th));
+  cx.closePath();cx.fill();
+}
+function chain(pts,rs){for(let i=0;i<pts.length-1;i++)capsule(pts[i],rs[i],pts[i+1],rs[i+1]);}
+function smoothClosed(pts){const n=pts.length,mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
+  cx.beginPath();const m0=mid(pts[n-1],pts[0]);cx.moveTo(m0[0],m0[1]);
+  for(let i=0;i<n;i++){const p1=pts[i],m=mid(p1,pts[(i+1)%n]);cx.quadraticCurveTo(p1[0],p1[1],m[0],m[1]);}
+  cx.closePath();cx.fill();}
+function flashAt(sx,sy,D,k,dpr,ht,hold){const pr=hold?clamp(ht/220,0,1):0.2;const r1=0.035*D.H*k,r2=r1+0.06*D.H*k*(0.4+pr);
+  cx.strokeStyle=CSSV.flash;cx.lineWidth=2.4*dpr;cx.lineCap='round';cx.globalAlpha=1-pr*0.7;
+  for(let i=0;i<8;i++){const a=i*Math.PI/4+0.3;cx.beginPath();cx.moveTo(sx+Math.cos(a)*r1,sy+Math.sin(a)*r1);cx.lineTo(sx+Math.cos(a)*r2,sy+Math.sin(a)*r2);cx.stroke();}
+  cx.globalAlpha=1;}
+
+/* proj(localPoint, z) → screen. Body-local helpers build shoe, calf and torso outline in the body's own frame. */
+function drawBody(b,proj,k,mode,isOpp,active,fwdScreen){
+  const D=b.D,p=b.p,z=b.z,P=b.P,H=D.H,front=mode==='front';
+  const m=b.mf||1,mL=Math.pow(m,.55),mT=Math.pow(m,.8);
+  const S=n=>proj(p[n],z[n]);const R=v=>v*H*k;
+  const cFar=isOpp?CSSV.opp:CSSV['fig-far'],cNear=isOpp?CSSV.opp:CSSV.fig,cAct=CSSV.accent;
+  const col=(key,near)=>(!isOpp&&active.has(key))?cAct:(near?cNear:cFar);
+  cx.globalAlpha=1;
+  const leg=(s,hip,key,near)=>{
+    const K=p[s+'k'],A=p[s+'a'],T=p[s+'t'];
+    const vx=A[0]-K[0],vy=A[1]-K[1],vl=Math.hypot(vx,vy)||1;
+    const calf=[lerp(K[0],A[0],.32)-vy/vl*0.012*H,lerp(K[1],A[1],.32)+vx/vl*0.012*H];
+    const dx=(T[0]-A[0])/D.foot,dy=(T[1]-A[1])/D.foot,qx=-dy,qy=dx;
+    const heel=[A[0]-dx*0.22*D.foot+qx*0.03*H,A[1]-dy*0.22*D.foot+qy*0.03*H];
+    const ball=[A[0]+dx*0.7*D.foot+qx*0.017*H,A[1]+dy*0.7*D.foot+qy*0.017*H];
+    const toe=[T[0]+qx*0.008*H,T[1]+qy*0.008*H];
+    cx.fillStyle=col(key,near);
+    const zh=z[hip],zk=z[s+'k'],za=z[s+'a'];
+    chain([proj(p[hip],zh),proj(K,zk),proj(calf,lerp(zk,za,.32)),proj(A,za)],[R(.06*mL),R(.032*Math.pow(m,.4)),R(.035*mL),R(.019)]);
+    chain([proj(heel,za),proj(ball,za),proj(toe,za)],[R(.022),R(.02),R(.012)]);
+  };
+  const arm=(sd,key,near)=>{
+    const el=p[sd+'el'],h=p[sd+'h'],sh=p['s'+sd];
+    const wr=[lerp(el[0],h[0],.84),lerp(el[1],h[1],.84)];
+    const zs=z['s'+sd],ze=z[sd+'el'],zh=z[sd+'h'];
+    cx.fillStyle=col(key,near);
+    let sc=1;if(front){sc=1+clamp((h[0]-p.neck[0])/D.arm,-.3,1)*(isOpp?-0.3:0.7);}
+    chain([proj(sh,zs),proj(el,ze),proj(wr,lerp(ze,zh,.84))],[R(.037*mL),R(.025*Math.pow(m,.4)),R(.018)*sc]);
+    const hs=proj(h,zh);
+    if(P[sd+'p']>0.5){const ws=proj(wr,lerp(ze,zh,.84));const ang=Math.atan2(hs[1]-ws[1],hs[0]-ws[0]);
+      const tip=[hs[0]+Math.cos(ang)*R(.035)*sc,hs[1]+Math.sin(ang)*R(.035)*sc];capsule(ws,R(.019)*sc,tip,R(.014)*sc);}
+    else{cx.beginPath();cx.arc(hs[0],hs[1],R(.029)*sc,0,Math.PI*2);cx.fill();}
+  };
+  // far side first
+  arm('R','Rarm',false);leg('r','hR','rleg',false);
+  // torso
+  const r0=S('root'),n0=S('neck');const ax=n0[0]-r0[0],ay=n0[1]-r0[1],L=Math.hypot(ax,ay)||1,ux=ax/L,uy=ay/L;
+  let px=-uy,py=ux;if(!front&&px*fwdScreen<0){px=-px;py=-py;}
+  const tw=Math.abs(P.tw);
+  const prof=[[-.16,.12,.17,.42],[.08,.115,.165,.45],[.33,.105*m,.145*mL,.58],[.62,.13,.18,.56],[.88,.115,.215,.5],[1.0,.08,.2,.5]];
+  const fr=[],bk=[];
+  prof.forEach(([s,dep,wid,ff])=>{const dd=dep*(s>.2&&s<.5?mT:Math.pow(m,.6)),ww=wid*(s>.2&&s<.5?Math.pow(m,.7):mL);
+    const T=front?lerp(ww,dd,tw*.7):lerp(dd,ww,tw*.6);const f=front?.5:ff;
+    const c=[r0[0]+ux*L*s,r0[1]+uy*L*s];fr.push([c[0]+px*R(T)*f,c[1]+py*R(T)*f]);bk.push([c[0]-px*R(T)*(1-f),c[1]-py*R(T)*(1-f)]);});
+  const top=[n0[0]+ux*R(.03),n0[1]+uy*R(.03)];
+  cx.fillStyle=cNear;smoothClosed([...fr,top,...bk.reverse()]);
+  // neck and head
+  const hd=S('head');capsule(n0,R(.03*Math.pow(m,.3)),[lerp(n0[0],hd[0],.7),lerp(n0[1],hd[1],.7)],R(.026));
+  const rot=Math.atan2(uy,ux)+Math.PI/2;
+  cx.save();cx.translate(hd[0],hd[1]);cx.rotate(rot*0.75);
+  cx.beginPath();cx.ellipse(0,0,R(front?.05:.054),R(.066),0,0,Math.PI*2);cx.fill();
+  if(!front){const fs=Math.sign(fwdScreen)||1;cx.beginPath();cx.ellipse(fs*R(.022),R(.03),R(.034),R(.036),0,0,Math.PI*2);cx.fill();
+    cx.beginPath();cx.moveTo(fs*R(.05),-R(.005));cx.lineTo(fs*R(.068),R(.014));cx.lineTo(fs*R(.048),R(.02));cx.closePath();cx.fill();}
+  else{[-1,1].forEach(sg=>{cx.beginPath();cx.ellipse(sg*R(.052),R(.004),R(.01),R(.016),0,0,Math.PI*2);cx.fill();});}
+  cx.restore();
+  // near side
+  leg('l','hL','lleg',true);arm('L','Larm',true);
+  cx.globalAlpha=1;
+}
+function drawOppHands(b,proj,k){
+  const D=b.D,H=D.H;cx.globalAlpha=0.5;cx.fillStyle=CSSV.opp;
+  ['L','R'].forEach(sd=>{const el=b.p[sd+'el'],h=b.p[sd+'h'];const toward=(h[0]-b.p.neck[0])/D.arm;const sc=1.1-clamp(toward,-.2,1)*0.35;
+    capsule(proj(el,b.z[sd+'el']),.03*H*k*sc,proj(h,b.z[sd+'h']),.02*H*k*sc);const hs=proj(h,b.z[sd+'h']);cx.beginPath();cx.arc(hs[0],hs[1],.034*H*k*sc,0,Math.PI*2);cx.fill();});
+  cx.globalAlpha=1;
+}
+function activeSet(A){const s=new Set();if(A.def.act){A.def.act.forEach(x=>s.add(x));return s;}const map={Lh:'Larm',Lel:'Larm',Rh:'Rarm',la:'lleg',lt:'lleg',ra:'rleg',rt:'rleg',rk:'rleg'};A.k.forEach(k=>{if(k.hit&&map[k.hit])s.add(map[k.hit]);});
+  if(!s.size){const id=PL.id;if(id==='wrist')s.add('Larm');if(id==='sprawl'||id==='foot'||id==='stance'){s.add('lleg');s.add('rleg');}if(id==='cover'||id==='fence'){s.add('Larm');s.add('Rarm');}}
+  return s;}
+function drawScene(A,s,fr,view){
+  const W=cv.width,Hc=cv.height;if(!W)return;const dpr=W/cv.clientWidth;cx.clearRect(0,0,W,Hc);
+  const padTop=44*dpr,padBot=128*dpr;
+  const active=A.active;const DU=A.DU;
+  if(view==='front'){
+    const {k,X,Y}=viewXf(A.fview,padTop,padBot);const mir=PL.ctx&&PL.ctx.d.hand==='l'?-1:1;
+    const proj=b=>(lp,zz)=>[X(mir*(b.oz+b.dir*zz)),Y(lp[1])];
+    [fr.u,fr.o].forEach(b=>{if(!b)return;cx.fillStyle=CSSV.line;cx.globalAlpha=.7;cx.beginPath();cx.ellipse(X(mir*b.oz),Y(0),0.17*b.D.H*k,0.02*b.D.H*k,0,0,Math.PI*2);cx.fill();cx.globalAlpha=1;});
+    if(A.barY){cx.strokeStyle=CSSV['bag-line'];cx.lineCap='round';cx.lineWidth=Math.max(4*dpr,0.018*DU.H*k);cx.beginPath();cx.moveTo(X(-0.4*DU.H),Y(-A.barY));cx.lineTo(X(0.4*DU.H),Y(-A.barY));cx.stroke();}
+    const facing=fr.o&&Math.abs(A.oz)<1;
+    if(fr.o&&!facing) drawBody(fr.o,proj(fr.o),k,'front',true,active,0);
+    drawBody(fr.u,proj(fr.u),k,'front',false,active,0);
+    if(facing) drawOppHands(fr.o,proj(fr.o),k);
+    const pt=(b,n)=>proj(b)(b.p[n],b.z[n]);
+    if(s.b.hit&&(s.hold||s.u>0.92)&&s.ht<260){const q=pt(fr.u,s.b.hit);flashAt(q[0],q[1],fr.u.D,k,dpr,s.ht,s.hold);}
+    if(s.b.ohit&&!s.b.om&&fr.o&&(s.hold||s.u>0.92)&&s.ht<260){const q=pt(fr.o,s.b.ohit);flashAt(q[0],q[1],fr.o.D,k,dpr,s.ht,s.hold);}
+    return;
+  }
+  const {k,X,Y,offX}=viewXf(A.view,padTop,padBot);
+  // floor: shadows, zones, tape
+  [fr.u,fr.o].forEach(b=>{if(!b)return;const c=b.ox+b.dir*b.p.root[0];cx.fillStyle=CSSV.line;cx.globalAlpha=.7;cx.beginPath();cx.ellipse(X(c),Y(0),0.3*b.D.H*k,0.018*b.D.H*k,0,0,Math.PI*2);cx.fill();cx.globalAlpha=1;});
+  const z=PL.zoneData;
+  if(z&&!A.def.calm){const bandY=Y(0.03*DU.H),bh=Math.max(3*dpr,0.012*DU.H*k);
+    [[0,z.cl,'z-clinch'],[z.cl,z.pu,'z-punch'],[z.pu,z.ki,'z-kick']].forEach(([a,b,c])=>{cx.fillStyle=CSSV[c];cx.globalAlpha=.75;cx.fillRect(X(z.from+a),bandY,(b-a)*k,bh);});cx.globalAlpha=1;}
+  cx.fillStyle=CSSV.muted;cx.strokeStyle=CSSV.muted;cx.font=`${10*dpr}px "IBM Plex Mono",monospace`;cx.textAlign='center';cx.textBaseline='top';
+  const gx0=-offX/k,gx1=(W-offX)/k,ty=Y(0.055*DU.H);
+  for(let c=Math.ceil(gx0/50)*50;c<=gx1;c+=50){cx.globalAlpha=.6;cx.lineWidth=dpr;cx.beginPath();cx.moveTo(X(c),ty);cx.lineTo(X(c),ty+(c%100===0?6:3)*dpr);cx.stroke();
+    if(c%100===0)cx.fillText(c===0?'0':(c/100)+' м',X(c),ty+8*dpr);cx.globalAlpha=1;}
+  if(A.bag!=null){
+    let rec=0;if(s.b.hit&&s.hold) rec=0.035*DU.H*Math.max(0,1-s.ht/Math.max(160,s.b.h+60));
+    const bx=X(A.bag+rec),bw=0.2*DU.H*k,yt=Y(-0.98*DU.H),yb=Y(-0.22*DU.H);
+    cx.strokeStyle=CSSV['bag-line'];cx.lineWidth=1.2*dpr;cx.beginPath();cx.moveTo(bx+bw/2,0);cx.lineTo(bx+bw/2,yt);cx.stroke();
+    cx.fillStyle=CSSV.bag;cx.beginPath();if(cx.roundRect)cx.roundRect(bx,yt,bw,yb-yt,bw*0.35);else cx.rect(bx,yt,bw,yb-yt);cx.fill();
+    cx.fillStyle=CSSV['bag-line'];cx.globalAlpha=.35;cx.fillRect(bx,yt+(yb-yt)*.12,bw,2*dpr);cx.fillRect(bx,yb-(yb-yt)*.12,bw,2*dpr);cx.globalAlpha=1;
+  }
+  if(A.barY){cx.strokeStyle=CSSV['bag-line'];cx.lineCap='round';cx.lineWidth=Math.max(4*dpr,0.018*DU.H*k);cx.beginPath();cx.moveTo(X(A.barX-0.16*DU.H),Y(-A.barY));cx.lineTo(X(A.barX+0.16*DU.H),Y(-A.barY));cx.stroke();
+    cx.lineWidth=2*dpr;cx.beginPath();cx.moveTo(X(A.barX-0.16*DU.H),Y(-A.barY));cx.lineTo(X(A.barX-0.16*DU.H),0);cx.moveTo(X(A.barX+0.16*DU.H),Y(-A.barY));cx.lineTo(X(A.barX+0.16*DU.H),0);cx.stroke();}
+  const proj=b=>(lp)=>[X(b.ox+b.dir*lp[0]),Y(lp[1])];
+  if(fr.o) drawBody(fr.o,proj(fr.o),k,'side',true,active,-1);
+  drawBody(fr.u,proj(fr.u),k,'side',false,active,1);
+  const pt=(b,n)=>proj(b)(b.p[n]);
+  if(s.b.hit&&(s.hold||s.u>0.92)&&s.ht<260){const q=pt(fr.u,s.b.hit);flashAt(q[0],q[1],fr.u.D,k,dpr,s.ht,s.hold);}
+  if(s.b.ohit&&!s.b.om&&fr.o&&(s.hold||s.u>0.92)&&s.ht<260){const q=pt(fr.o,s.b.ohit);flashAt(q[0],q[1],fr.o.D,k,dpr,s.ht,s.hold);}
+}
+
+/* ================= Player ================= */
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+const PL={id:'plan',A:null,t:0,playing:!reduce,speed:1,view:'side',last:0,clock:0,zoneData:null,ctx:null,loop:0,lastI:-1};
+const SHORT={plan:'Ойын жоспары'};
+function animKey(id,ctx){return id==='plan'?'plan'+ctx.arch[0][0]:id;}
+function nameOf(id){return id==='plan'?'Ойын жоспары':NAMES&&NAMES[id]?NAMES[id]:(T.find(x=>x.id===id)||{}).n||'';}
+let lastCap=-1;
+function setupAnim(){
+  const c=PL.ctx;const def=ANIM[animKey(PL.id,c)];
+  PL.A=compile(def,c.DU,c.DO);PL.A.mf=c.mf;PL.A.active=activeSet(PL.A);
+  PL.t=PL.t%PL.A.total;
+  if(!PL.playing){const hi=PL.A.k.findIndex(x=>x.hit||x.ohit);PL.t=PL.A.marks[Math.max(0,hi)]+1;}
+  const gb=torso(mix(G,G,1,c.DU),c.DU,0,1,0);
+  PL.zoneData={from:gb.p.neck[0],cl:c.m.clinch,pu:c.m.punch,ki:c.m.kick};
+  const gl=KS.on?goals().find(g=>g.id===PL.id):null;
+  $('#anim-title').textContent=gl?'×1000 · '+gl.g+' · '+nameOf(PL.id):PL.id==='plan'?'Ойын жоспары · '+ARCH[c.arch[0][0]].short:nameOf(PL.id);
+  $('#dots').innerHTML=PL.A.caps.map((x,i)=>`<button type="button" data-c="${i}" aria-label="${i+1}-қадам: ${x}"><span></span></button>`).join('');
+  const dist=$('#dist');
+  dist.textContent=(PL.view==='front'||KS.on)?'':PL.A.bag!=null?`қапқа дейін ${r0(PL.A.bag-PL.A.toe)} см`:PL.id==='plan'?`соққың ${r0(c.m.punch)} см · орташа ${r0(c.m.avgPunch)} см`:'';
+  document.querySelectorAll('#chips .chip').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===PL.id?'true':'false'));
+  const on=document.querySelector(`#chips .chip[data-id="${PL.id}"]`);if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest',inline:'center',behavior:'auto'});
+  if(KS.on){renderKC();const st=loadStore();st.k1000anim=PL.id;saveStore(st);}
+  lastCap=-1;
+}
+function loopFn(now){
+  const dt=PL.last?Math.min(64,now-PL.last):16;PL.last=now;PL.clock+=dt;
+  if(PL.playing&&PL.A) PL.t+=dt*PL.speed;
+  roundTick(dt);
+  if(PL.A){
+    fitCanvas();
+    const s=sample(PL.A,PL.t);const fr=build(PL.A,s,PL.clock);
+    drawScene(PL.A,s,fr,PL.view);
+    const loop=Math.floor(PL.t/PL.A.total);
+    if(loop>PL.loop){PL.loop=loop;if(RS.on&&RS.phase==='work'){RS.reps++;RS.total++;}if(KS.on&&PL.playing)addRep(PL.id);}
+    if(s.i!==PL.lastI){PL.lastI=s.i;if(RS.on&&RS.phase==='work'&&PL.playing&&PL.A.k[s.i].hit)hitBeep();}
+    const c=s.b.c;
+    if(c!==lastCap){lastCap=c;$('#cap').textContent=PL.A.caps[c]||'';document.querySelectorAll('#dots button').forEach((b,i)=>b.classList.toggle('on',i<=c));}
+  }
+  requestAnimationFrame(loopFn);
+}
+function jumpTo(dir){
+  const A=PL.A;const tt=((PL.t%A.total)+A.total)%A.total;const base=PL.t-tt;
+  const n=A.caps.length;const cur=sample(A,PL.t).b.c;const target=(cur+dir+n)%n;
+  const i=A.k.findIndex(x=>x.c===target);const m=A.marks[i]+1;
+  PL.t=base+m+(dir>0&&m<tt?A.total:0);PL.playing=false;syncPlay();
+}
+function syncPlay(){const b=$('#b-play');b.textContent=PL.playing?'❚❚':'▶';b.setAttribute('aria-label',PL.playing?'Тоқтату':'Ойнату');}
+function selectAnim(id){PL.id=id;PL.t=0;PL.loop=0;PL.lastI=-1;if(!reduce)PL.playing=true;syncPlay();setupAnim();const st=loadStore();st.anim=id;saveStore(st);}
+function setView(v){PL.view=v;$('#b-view').setAttribute('aria-pressed',v==='front'?'true':'false');if(PL.A)setupAnim();const st=loadStore();st.view=v;saveStore(st);}
+
+
+
+/* ================= Strength & mobility library (geometry computed from the user's own dimensions) ================= */
+function proneAt(D,shoulderH){const LL=D.thigh+D.shin,ankH=D.foot*0.9+D.ankle*0.2;return Math.asin(clamp((shoulderH-ankH)/(LL+D.torso),-0.5,0.9))/D2R;}
+function prone(D,aDeg,ankleX,extra){
+  const a=aDeg*D2R,LL=D.thigh+D.shin,ankH=D.foot*0.9+D.ankle*0.2;
+  const hipX=ankleX+LL*Math.cos(a),hipY=ankH+LL*Math.sin(a),lift=(ankH-D.ankle)/D.ins;
+  return {...G,hx:hipX/D.ins,cr:1-hipY/D.hipH,t:90-aDeg,tw:.05,lf:[ankleX/D.ins,lift],rf:[(ankleX-2)/D.ins,lift],lfo:80,rfo:80,
+    L:{g:.1},R:{g:.04},Lp:1,Rp:1,Le:1,Re:1,Lz:.13,Rz:-.13,Lf:.05,Rf:.05,lz:.05,rz:-.05,hz:0,...(extra||{})};
+}
+function supine(D,neckX,aDeg,feetX,extra){
+  const a=aDeg*D2R,sh=0.045*D.H,hipX=neckX+D.torso*Math.cos(a),hipY=sh+D.torso*Math.sin(a);
+  return {...G,hx:hipX/D.ins,cr:1-hipY/D.hipH,t:-(90+aDeg),tw:.05,L:{g:.8},R:{g:.75},Lp:1,Rp:1,Lz:.14,Rz:-.14,Lf:0,Rf:0,
+    lf:[feetX/D.ins,0],rf:[(feetX-2)/D.ins,0],lfo:'auto',rfo:'auto',...(extra||{})};
+}
+const barY=D=>0.85*D.H+0.97*D.arm,barX=D=>0.1*D.ins+0.03*D.H;
+function hang(D,up){
+  const Yb=barY(D),neckY=up?Yb-0.03*D.H:Yb-0.95*D.arm,lift=neckY-0.82*D.H,hipY=D.hipH+lift,LL=D.thigh+D.shin;
+  const ax=0.1*D.ins-0.3*LL,ay=hipY-0.9*LL;
+  return {...G,hx:.1,cr:1-hipY/D.hipH,t:up?-5:0,tw:.05,L:{w:[barX(D),-Yb]},R:{w:[barX(D)-1,-Yb]},Le:1,Re:1,Lp:0,Rp:0,Lz:.17,Rz:-.17,Lf:.07,Rf:.07,
+    lf:[ax/D.ins,(ay-D.ankle)/D.ins],rf:[(ax-3)/D.ins,(ay-D.ankle)/D.ins],lfo:55,rfo:55};
+}
+function swing(D,ang){const LL=D.thigh+D.shin,hipX=.25*D.ins,hipY=D.hipH*0.995,a=ang*D2R;
+  const ax=hipX+LL*Math.sin(a),ay=hipY-LL*Math.cos(a);
+  return {...REL,hx:.25,cr:.005,tw:.3,rf:[.24,0],lf:[ax/D.ins,Math.max(0,(ay-D.ankle)/D.ins)],lfo:ang>20?-25:ang<-10?40:'auto',L:[.75,-.1],R:[.1,.95],Lp:1,lz:.06,rz:-.06};}
+function kneel(D,fwd,up){const th=D.thigh,kh=0.03*D.H,hipX=fwd*D.ins,hipY=kh+Math.sqrt(Math.max(1,th*th-hipX*hipX));
+  return {...G,hx:hipX/D.ins,cr:1-hipY/D.hipH,t:up?-6:4,tw:.25,lf:[(0.62*D.ins+th*0.15)/D.ins,0],lfo:'auto',rf:[-D.shin*0.97/D.ins,0.0],rfo:178,
+    L:up?[.06,-.97]:[.45,.35],R:up?[.04,-.97]:[.3,.5],Lp:up?1:0,Rp:up?1:0};}
+const STAND={...REL,lf:[.27,0],rf:[.22,0],hx:.24,tw:.25,L:[.3,.7],R:[.25,.72]};
+const SQ={...STAND,cr:.42,t:38,hx:.02,L:[.97,-.05],R:[.95,-.02]};
+const DEEP={...STAND,cr:.6,t:22,hx:.12,L:[.45,.12],R:[.4,.15],Lp:1,Rp:1};
+const circ=a=>[Math.sin(a*D2R)*.97,Math.cos(a*D2R)*.97];
+Object.assign(ANIM,{
+ pushup:{calm:1,act:['Larm','Rarm'],caps:['Денең бір түзу сызық','Кеуде еденге дейін, шынтақ 45°','Итеріп, толық көтеріл'],k:[
+  D=>({...prone(D,proneAt(D,0.93*D.arm),-0.45*D.ins),d:500,h:250,c:0}),
+  D=>({...prone(D,proneAt(D,0.3*D.arm),-0.45*D.ins),d:900,h:120,c:1}),
+  D=>({...prone(D,proneAt(D,0.93*D.arm),-0.45*D.ins),d:650,h:200,c:2,e:'out'})]},
+ squat:{calm:1,act:['lleg','rleg'],caps:['Аяқ иық енінде, табан толық','Жамбас артқа-төмен, тізе башпай бағытында','Өкшемен итеріп тұр'],k:[
+  {...STAND,d:500,h:300,c:0},{...SQ,d:900,h:150,c:1},{...STAND,d:700,h:200,c:2,e:'out'}]},
+ pullup:{calm:1,act:['Larm','Rarm'],prop:'bar',barY,barX,caps:['Толық салбыра, иық белсенді','Жауырынды төмен, кеудені турникке','Иек турниктен асады','Баяу түс'],k:[
+  D=>({...hang(D,false),d:600,h:350,c:0}),D=>({...hang(D,true),d:900,h:200,c:1}),D=>({...hang(D,true),d:120,h:150,c:2}),D=>({...hang(D,false),d:1100,h:150,c:3})]},
+ bridge:{calm:1,act:['lleg','rleg'],caps:['Арқамен жат, табан еденде','Жамбасты көтер, бөксені қыс','Баяу түсір'],k:[
+  D=>({...supine(D,-0.45*D.ins-D.torso,0,-0.45*D.ins+0.5*D.ins),d:500,h:250,c:0}),
+  D=>({...supine(D,-0.45*D.ins-D.torso,24,-0.45*D.ins+0.5*D.ins),d:700,h:500,c:1,e:'out'}),
+  D=>({...supine(D,-0.45*D.ins-D.torso,0,-0.45*D.ins+0.5*D.ins),d:800,h:150,c:2})]},
+ legraise:{calm:1,act:['lleg','rleg'],caps:['Арқамен жат, бел еденге басулы','Түзу аяқты тік көтер','Еденге тигізбей түсір'],k:[
+  D=>{const LL=D.thigh+D.shin,s=supine(D,-D.torso,0,0);const hx=s.hx*D.ins;return {...s,lf:[(hx+LL*0.97)/D.ins,0.02],rf:[(hx+LL*0.97-2)/D.ins,0.02],lfo:-75,rfo:-75,d:500,h:200,c:0};},
+  D=>{const LL=D.thigh+D.shin,s=supine(D,-D.torso,0,0);const hx=s.hx*D.ins,hy=(1-s.cr)*D.hipH;return {...s,lf:[(hx+LL*0.12)/D.ins,(hy+LL*0.97-D.ankle)/D.ins],rf:[(hx+LL*0.12-2)/D.ins,(hy+LL*0.97-D.ankle)/D.ins],lfo:-5,rfo:-5,d:1000,h:200,c:1};},
+  D=>{const LL=D.thigh+D.shin,s=supine(D,-D.torso,0,0);const hx=s.hx*D.ins,hy=(1-s.cr)*D.hipH;return {...s,lf:[(hx+LL*0.95)/D.ins,(hy+LL*0.15-D.ankle)/D.ins],rf:[(hx+LL*0.95-2)/D.ins,(hy+LL*0.15-D.ankle)/D.ins],lfo:-70,rfo:-70,d:1200,h:100,c:2};}]},
+ burpee:{calm:1,act:[],caps:['Отыр, қол еденге','Аяқты артқа: планка','Аяқты қайтар','Секіріп, қол жоғары'],k:[
+  {...STAND,d:500,h:150,c:0},{...STAND,cr:.55,t:45,hx:.1,L:{g:.35},R:{g:.3},Lp:1,Rp:1,d:350,c:0},
+  D=>({...prone(D,proneAt(D,0.93*D.arm),-0.75*D.ins),d:300,h:200,c:1}),
+  {...STAND,cr:.55,t:45,hx:.1,L:{g:.35},R:{g:.3},Lp:1,Rp:1,lfo:'auto',rfo:'auto',d:300,c:2},
+  {...STAND,cr:-.1,t:0,lf:[.27,.12],rf:[.22,.12],L:[.05,-.97],R:[.03,-.97],Lp:1,Rp:1,d:300,h:120,c:3,e:'out'},
+  {...STAND,d:250,h:200,c:3}]},
+ legswing:{calm:1,act:['lleg'],caps:['Бір аяқта тік тұр','Түзу аяқты алға сермеу','Артқа сермеу, бел түзу'],k:[
+  D=>({...swing(D,0),d:400,h:150,c:0}),D=>({...swing(D,78),d:520,h:40,c:1}),D=>({...swing(D,0),d:330,c:2,e:'lin'}),D=>({...swing(D,-35),d:330,h:40,c:2,e:'out'}),D=>({...swing(D,0),d:330,c:2})]},
+ hipflex:{calm:1,act:['rleg'],caps:['Бір тізеге отыр, бел түзу','Жамбасты алға итер, бөксені қыс','Қолды көтеріп, 2 секунд ұста'],k:[
+  D=>({...kneel(D,0,false),d:600,h:300,c:0}),D=>({...kneel(D,.17,false),d:800,c:1}),D=>({...kneel(D,.2,true),d:600,h:900,c:2}),D=>({...kneel(D,0,false),d:800,h:200,c:0})]},
+ fold:{calm:1,act:['lleg','rleg'],caps:['Тік тұр, тізе түзу','Жамбастан бүгіл, арқа түзу','Қол еденге, 2 секунд','Баяу көтеріл'],k:[
+  {...STAND,cr:0,d:500,h:300,c:0},{...STAND,cr:0,t:62,hx:.12,L:[.4,.85],R:[.35,.87],d:800,c:1},{...STAND,cr:0,t:108,hx:.06,L:{g:.2},R:{g:.15},Lp:1,Rp:1,d:700,h:900,c:2},{...STAND,cr:0,d:1000,h:200,c:3}]},
+ deepsq:{calm:1,act:['lleg','rleg'],caps:['Терең отыр, өкше еденде','Шынтақпен тізені сыртқа ит','Алға-артқа баяу тербел'],k:[
+  {...STAND,d:500,h:200,c:0},{...DEEP,d:1000,h:400,c:0},{...DEEP,L:[.38,.3],R:[.33,.32],d:400,h:500,c:1},{...DEEP,t:30,hx:.17,d:700,h:200,c:2},{...DEEP,t:16,hx:.08,d:700,h:200,c:2},{...STAND,d:900,h:200,c:0}]},
+ armcirc:{calm:1,act:['Larm','Rarm'],caps:['Қол алдыға','Жоғары','Артқа','Төмен'],k:[0,45,90,135,180,225,270,315].map((a,i)=>({...REL,L:circ(a+90),R:circ(a+90),c:Math.floor(i/2),d:230,h:0,e:'lin'}))}
+});
+const NAMES={pushup:'Отжимание',squat:'Присед',pullup:'Тартылу',bridge:'Жамбас көпірі',legraise:'Аяқ көтеру',burpee:'Берпи',legswing:'Аяқ сермеу',hipflex:'Тізерлеп созылу',fold:'Алға еңкею',deepsq:'Терең присед',armcirc:'Қол айналдыру'};
+
+/* ================= ×1000: one technique, a thousand times ================= */
+const GOALS=[
+ {id:'fence',g:'Қақтығысты тоқтату'},
+ {id:'palm',g:'Бірінші соққы'},
+ {id:'teep',g:'Қашықтық'},
+ {id:'cover',g:'Басты қорғау'},
+ {id:'getup',g:'Аяқта қалу'},
+ {id:'head',g:'Босану'}
+];
+const PERSONAL={R:'jab',P:'hook',C:'knee',E:'slip'};
+const CATS=[['fight','Көше'],['str','Күш'],['flex','Икемділік']];
+const GOALS_STR=[{id:'pushup',g:'Итеру күші'},{id:'squat',g:'Аяқ күші'},{id:'pullup',g:'Тарту күші'},{id:'bridge',g:'Жамбас күші'},{id:'legraise',g:'Бұлшықет орталығы'},{id:'burpee',g:'Шыдамдылық'}];
+const GOALS_FLEX=[{id:'legswing',g:'Тебіс амплитудасы'},{id:'hipflex',g:'Жамбас бүккіші'},{id:'fold',g:'Сан арты'},{id:'deepsq',g:'Терең отыру'},{id:'armcirc',g:'Иық буыны'}];
+function goalsOf(cat){if(cat==='str')return GOALS_STR;if(cat==='flex')return GOALS_FLEX;const p=PERSONAL[PL.ctx.arch[0][0]];return [{id:p,g:'Сенің қаруың'},...GOALS];}
+function goals(){return goalsOf(KS.cat);}
+function catOf(id){if(GOALS_STR.some(g=>g.id===id))return 'str';if(GOALS_FLEX.some(g=>g.id===id))return 'flex';return 'fight';}
+function firstOf(cat){return cat==='fight'?'palm':goalsOf(cat)[0].id;}
+const STAGES_STR=[[0,'Дұрыс форма, асықпа'],[100,'Толық амплитудамен'],[300,'Төмен 3 секунд, жоғары жылдам'],[600,'Күрделі нұсқа немесе салмақ қос'],[900,'Шаршаған күйде, форманы сақта'],[1000,'Келесі мың: күрделі нұсқамен']];
+const STAGES_FLEX=[[0,'Жеңіл, ауырсынусыз'],[100,'Амплитуданы біртіндеп ұлғайт'],[300,'Соңғы нүктеде 2 секунд ұста'],[600,'Күніне екі рет: таңертең, кешке'],[900,'Жылынғаннан кейін, терең'],[1000,'Сақтау: күн сайын 30 қайталау']];
+const STAGES=[[0,'Баяу, айна алдында: тек форма'],[100,'Толық жылдамдықпен, ауада'],[300,'Қапқа немесе ұстағышқа'],[600,'Шаршаған күйде: алдымен 20 спрол'],[900,'Кенет сигналмен: серіктес белгі береді'],[1000,'Автоматты. Келесі мың — стресс астында']];
+const KS={on:false,cat:'fight',counts:{},ref:null,timer:null,writing:Promise.resolve(),flash:0};
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function cnt(id){return KS.counts[id]||{n:0,d:'',t:0};}
+function stageOf(n,id){const L=catOf(id||PL.id)==='str'?STAGES_STR:catOf(id||PL.id)==='flex'?STAGES_FLEX:STAGES;let s=L[0];L.forEach(x=>{if(n>=x[0])s=x;});return s;}
+function addRep(id){
+  const c={...cnt(id)},td=today();if(c.d!==td){c.d=td;c.t=0;}c.n++;c.t++;KS.counts[id]=c;
+  if(STAGES.some(x=>x[0]===c.n&&x[0]>0)){KS.flash=c.n;gong(1);setTimeout(()=>{KS.flash=0;renderKC();},4000);}
+  saveCounts();renderKC();const ch=document.querySelector(`#chips .chip[data-id="${id}"] .n`);if(ch)ch.textContent=c.n;
+}
+function saveCounts(){
+  const st=loadStore();st.counts=KS.counts;saveStore(st);
+  if(!KS.ref)return;clearTimeout(KS.timer);
+  KS.timer=setTimeout(()=>{const body={counts:JSON.parse(JSON.stringify(KS.counts))};KS.writing=KS.writing.then(()=>KS.ref.set(body)).catch(()=>{});},4000);
+}
+function mergeCounts(a,b){const out={...a};Object.entries(b||{}).forEach(([k,v])=>{const x=out[k];if(!x||((v&&v.n)||0)>x.n)out[k]={n:+v.n||0,d:String(v.d||''),t:+v.t||0};});return out;}
+async function initDb(){
+  try{
+    if(!window.claude||!window.claude.use)return;
+    const [db,user]=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
+    if(!db||!user)return;const id=await user.id();if(!id)return;
+    KS.ref=db.doc(`data/users/${id}/reps`);
+    const snap=await KS.ref.get();
+    if(snap.exists){const d=snap.data()||{};KS.counts=mergeCounts(KS.counts,d.counts);const st=loadStore();st.counts=KS.counts;saveStore(st);if(KS.on){renderChips();renderKC();}}
+  }catch(e){KS.ref=null;}
+}
+function renderKC(){
+  const kc=$('#kc');kc.hidden=!KS.on;if(!KS.on)return;
+  const c=cnt(PL.id),n=c.n;$('#kc-n').textContent=n;$('#kc-fill').style.width=Math.min(100,n/10)+'%';
+  const st=$('#kc-st');
+  if(KS.flash){st.className='kc-st up';st.textContent=`${KS.flash} ✓ Келесі деңгей: ${stageOf(KS.flash)[1]}`;}
+  else{st.className='kc-st';st.textContent=stageOf(n)[1];}
+  $('#kc-today').textContent=c.d===today()?`бүгін ${c.t}`:'бүгін 0';
+}
+function renderChips(){
+  if(KS.on){$('#chips').innerHTML=CATS.map(([k,n])=>`<button type="button" class="tab" data-cat="${k}" aria-pressed="${k===KS.cat}">${n}</button>`).join('')+'<span class="sep"></span>'+goals().map(g=>`<button type="button" class="chip" data-id="${g.id}">${g.g}<span class="n">${cnt(g.id).n}</span></button>`).join('');}
+  else{$('#chips').innerHTML=`<button type="button" class="chip plan" data-id="plan">Ойын жоспары</button>`+PL.ctx.tech.map(t=>`<button type="button" class="chip" data-id="${t.id}">${t.n}</button>`).join('');}
+  document.querySelectorAll('#chips .chip').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===PL.id?'true':'false'));
+}
+function setMode1000(on){
+  KS.on=on;$('#b-1000').setAttribute('aria-pressed',on?'true':'false');
+  const st=loadStore();st.k1000=on;saveStore(st);
+  renderChips();
+  const ids=goals().map(g=>g.id);
+  if(on&&!ids.includes(PL.id))selectAnim(st.k1000anim&&ids.includes(st.k1000anim)?st.k1000anim:firstOf(KS.cat));
+  else if(!on&&PL.id!=='plan'&&!T.some(x=>x.id===PL.id))selectAnim('plan');
+  else setupAnim();
+  renderKC();
+}
+
+/* ================= Round timer ================= */
+const RS={on:false,phase:'work',round:1,left:0,reps:0,total:0,rot:0,rotLeft:30000,list:[],warned:false,hold:false};
+let AC=null,WL=null;
+function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){AC=null;}}if(AC&&AC.state==='suspended')AC.resume();return AC;}
+function tone(f,dur,type,vol,when){const a=ac();if(!a)return;const t=a.currentTime+(when||0);
+  const o=a.createOscillator(),g=a.createGain();o.type=type||'sine';o.frequency.value=f;
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol||.3,t+.006);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+dur+.05);}
+function gong(n){for(let i=0;i<(n||1);i++){const w=i*0.55;tone(392,1.5,'sine',.32,w);tone(784,1.1,'sine',.12,w);tone(1180,.7,'triangle',.05,w);}}
+function knock(){[0,.16,.32].forEach(w=>tone(1500,.05,'square',.1,w));}
+function hitBeep(){tone(880,.045,'square',.06);}
+function fmt(ms){const s=Math.max(0,Math.ceil(ms/1000));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+async function wake(on){try{if(on&&navigator.wakeLock&&!WL){WL=await navigator.wakeLock.request('screen');}if(!on&&WL){await WL.release();WL=null;}}catch(e){WL=null;}}
+function roundCfg(){return {n:+$('#r-n').value,len:+$('#r-len').value*1000,rest:60000};}
+function startRound(){
+  ac();Object.assign(RS,{on:true,phase:'work',round:1,left:roundCfg().len,reps:0,total:0,warned:false,hold:false,rot:0,rotLeft:30000});
+  RS.list=KS.on?goals().map(g=>g.id):['plan',...PL.ctx.tech.slice(0,5).map(t=>t.id)];if(RS.list[0]!==PL.id)selectAnim(RS.list[0]);
+  PL.playing=true;syncPlay();gong(1);wake(true);syncRound();
+}
+function stopRound(done){
+  RS.on=false;wake(false);$('#rbar').style.width='0';
+  if(done){gong(3);$('#hud-phase').textContent='Бітті';$('#hud-time').textContent='0:00';$('#hud-reps').textContent=`${RS.total} қайталау`;$('#hud').className='hud';$('#hud').hidden=false;setTimeout(()=>{if(!RS.on)$('#hud').hidden=true;},8000);}
+  else $('#hud').hidden=true;
+  syncRound();
+}
+function syncRound(){const b=$('#b-round');b.classList.toggle('on',RS.on);b.textContent=RS.on?'■ Тоқтат':'Раунд';}
+function roundTick(dt){
+  if(!RS.on) return;
+  const {n,len,rest}=roundCfg();
+  const running=RS.phase==='work'?PL.playing:!RS.hold;
+  if(running){RS.left-=dt;if(RS.phase==='work'){RS.rotLeft-=dt;if(RS.rotLeft<=0){RS.rotLeft=30000;RS.rot=(RS.rot+1)%RS.list.length;selectAnim(RS.list[RS.rot]);tone(660,.12,'sine',.15);}}}
+  if(RS.phase==='work'&&!RS.warned&&RS.left<=10000){RS.warned=true;knock();}
+  if(RS.left<=0){
+    if(RS.phase==='work'){
+      if(RS.round>=n){stopRound(true);return;}
+      RS.phase='rest';RS.left=rest;RS.hold=false;PL.playing=false;syncPlay();gong(1);RS.rot=(RS.rot+1)%RS.list.length;
+    } else {
+      RS.round++;RS.phase='work';RS.left=len;RS.reps=0;RS.warned=false;RS.rotLeft=30000;
+      selectAnim(RS.list[RS.rot]);PL.playing=true;syncPlay();gong(1);
+    }
+  }
+  const hud=$('#hud');hud.hidden=false;
+  hud.className='hud'+(RS.phase==='rest'?' rest':'')+(RS.phase==='work'&&RS.left<=10000?' warn':'');
+  $('#hud-phase').textContent=RS.phase==='rest'?'Демалыс':`${RS.round}/${n} раунд`+(running?'':' · пауза');
+  $('#hud-time').textContent=fmt(RS.left);
+  $('#hud-reps').textContent=RS.phase==='rest'?`келесі: ${nameOf(RS.list[RS.rot])}`:`${RS.reps} қайталау`;
+  const tot=RS.phase==='rest'?rest:len;const bar=$('#rbar');bar.className='rbar'+(RS.phase==='rest'?' rest':'');bar.style.width=(100*(1-RS.left/tot)).toFixed(2)+'%';
+}
+
+/* ================= Inputs & render ================= */
+const DEF={sex:'m',h:178,w:80,ws:183,ins:82,hand:'r'};
+function pressed(a,b,va,vb){return $('#'+a).getAttribute('aria-pressed')==='true'?va:vb;}
+function read(){
+  const n=(id,d,lo,hi)=>{const v=+$('#'+id).value;return v>0?clamp(v,lo,hi):d;};
+  return {sex:pressed('sex-m','sex-f','m','f'),h:n('h',DEF.h,130,220),w:n('w',DEF.w,35,200),ws:n('ws',DEF.ws,110,250),ins:n('ins',DEF.ins,50,115),
+    hand:pressed('hand-r','hand-l','r','l'),age:30,fit:2,exp:0,bg:'none',spw:3,knee:false,back:false,sh:false};
+}
+function setPair(a,b,first){$('#'+a).setAttribute('aria-pressed',first?'true':'false');$('#'+b).setAttribute('aria-pressed',first?'false':'true');}
+function write(d){['h','w','ws','ins'].forEach(k=>$('#'+k).value=d[k]);setPair('sex-m','sex-f',d.sex!=='f');setPair('hand-r','hand-l',d.hand!=='l');}
+function render(){
+  const d=read();const st=loadStore();st.input={sex:d.sex,h:d.h,w:d.w,ws:d.ws,ins:d.ins,hand:d.hand};st.rn=$('#r-n').value;st.rl=$('#r-len').value;saveStore(st);
+  const m=model(d),arch=scoreArch(d,m),tech=rankTech(d,m,arch);
+  const DU=dimsOf(d.h,d.ws,d.ins),DO=dimsOf(m.hn,m.hn,0.46*m.hn);
+  const mf=clamp(m.bmi/23,0.8,1.55);
+  PL.ctx={d,m,arch,tech,DU,DO,mf};
+  const A=ARCH[arch[0][0]];
+  $('#style-pill').textContent=A.name;
+  $('#i-name').textContent=A.name;$('#i-idea').textContent=A.idea;$('#i-plan').innerHTML=A.plan.map(x=>`<li>${x}</li>`).join('');
+  if(KS.on&&!goals().some(g=>g.id===PL.id))PL.id=firstOf(KS.cat);
+  renderChips();
+  setupAnim();renderKC();
+}
+
+/* ================= Events ================= */
+$('#chips').addEventListener('click',e=>{const tb=e.target.closest('.tab');if(tb){KS.cat=tb.dataset.cat;const st=loadStore();st.kcat=KS.cat;saveStore(st);renderChips();selectAnim(firstOf(KS.cat));renderKC();return;}const b=e.target.closest('.chip');if(b)selectAnim(b.dataset.id);});
+$('#dots').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const i=PL.A.k.findIndex(x=>x.c===+b.dataset.c);PL.t=PL.A.marks[i]+1;PL.playing=false;syncPlay();});
+$('#b-play').addEventListener('click',()=>{if(RS.on&&RS.phase==='rest'){RS.hold=!RS.hold;return;}PL.playing=!PL.playing;syncPlay();});
+$('#b-prev').addEventListener('click',()=>jumpTo(-1));
+$('#b-next').addEventListener('click',()=>jumpTo(1));
+$('#b-slow').addEventListener('click',e=>{PL.speed=PL.speed===1?0.5:1;e.currentTarget.setAttribute('aria-pressed',PL.speed<1?'true':'false');});
+$('#b-view').addEventListener('click',()=>setView(PL.view==='front'?'side':'front'));
+$('#b-round').addEventListener('click',()=>{RS.on?stopRound(false):startRound();});
+$('#b-1000').addEventListener('click',()=>setMode1000(!KS.on));
+cv.addEventListener('click',()=>{PL.playing=!PL.playing;syncPlay();});
+cv.addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();PL.playing=!PL.playing;syncPlay();}if(e.key==='ArrowRight')jumpTo(1);if(e.key==='ArrowLeft')jumpTo(-1);});
+const openSheet=id=>{$(id).hidden=false;const f=$(id).querySelector('input,button');if(f)f.focus();};
+$('#open-me').addEventListener('click',()=>openSheet('#sheet-me'));
+$('#open-info').addEventListener('click',()=>openSheet('#sheet-info'));
+document.querySelectorAll('.sheet').forEach(sh=>{sh.addEventListener('click',e=>{if(e.target===sh||e.target.closest('[data-close]'))sh.hidden=true;});});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.sheet').forEach(s=>s.hidden=true);});
+[['hand-r','hand-l'],['sex-m','sex-f']].forEach(([a,b])=>{$('#'+a).addEventListener('click',()=>{setPair(a,b,true);render();});$('#'+b).addEventListener('click',()=>{setPair(a,b,false);render();});});
+$('#f').addEventListener('input',render);
+$('#f').addEventListener('submit',e=>{e.preventDefault();$('#sheet-me').hidden=true;});
+if(window.matchMedia){const mq=matchMedia('(prefers-color-scheme: dark)');mq.addEventListener&&mq.addEventListener('change',tokens);}
+new MutationObserver(tokens).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+const st0=loadStore();
+if(st0.input)try{write({...DEF,...st0.input})}catch(e){}
+if(st0.rn)$('#r-n').value=st0.rn;if(st0.rl)$('#r-len').value=st0.rl;
+if(st0.anim&&(ANIM[st0.anim]||st0.anim==='plan'))PL.id=st0.anim;
+if(st0.view==='front'){PL.view='front';$('#b-view').setAttribute('aria-pressed','true');}
+KS.counts=mergeCounts({},st0.counts||{});if(st0.kcat)KS.cat=st0.kcat;if(st0.k1000){KS.on=true;$('#b-1000').setAttribute('aria-pressed','true');}
+tokens();syncPlay();render();requestAnimationFrame(loopFn);initDb();
+})();
+</script>
+
+</body>
+</html>
